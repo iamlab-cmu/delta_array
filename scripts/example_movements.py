@@ -2,7 +2,7 @@ from DeltaArray import DeltaArray
 import numpy as np
 import time
 
-da = DeltaArray('/dev/cu.usbmodem11301')
+da = DeltaArray('/dev/ttyACM0')
 
 print(da.get_joint_positions())
 
