@@ -369,9 +369,9 @@ void loop()
 }
 
 float position_threshold = 0.00015;
-float p = 250.0;
-float i_pid = 8.0;
-float d = 0.0;
+float p = 90.0;
+float i_pid = 0.25;
+float d = 0.5;
 float last_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float total_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
