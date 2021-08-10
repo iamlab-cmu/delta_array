@@ -237,7 +237,7 @@ void updateJointPositions()
   for(int i = 0; i < NUM_MOTORS; i++)
   {
     motor_val[i] = adcs[i]->readADC_SingleEnded(channels[i]); 
-    joint_positions[i] = motor_val[i] * 0.0000978; // 100mm / 1023
+    joint_positions[i] = motor_val[i] * 0.00006; // 100mm / 1650
   }
 }
 
