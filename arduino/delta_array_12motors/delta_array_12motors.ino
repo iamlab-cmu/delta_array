@@ -328,6 +328,7 @@ void loop()
 float position_threshold = 0.00015;
 float p = 90.0;
 float i_pid = 0.25;
+
 float d = 0.5;
 float last_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -364,7 +365,7 @@ void moveDeltaPosition()
         float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
         int motor_speed = (int)(min(max(0.0, pid), 1.0) * 255.0);
         motors[i]->setSpeed(motor_speed);
-        motors[i]->run(FORWARD);
+        motors[i]->run(BACKWARD);
         joint_velocities[i] = -max_motor_speed[i];
         if(joint_errors[i] < 0.01) {
           total_joint_errors[i] += joint_errors[i];
@@ -375,7 +376,7 @@ void moveDeltaPosition()
         float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
         int motor_speed = (int)(min(max(-1.0, pid), 0.0) * -255.0);
         motors[i]->setSpeed(motor_speed);
-        motors[i]->run(BACKWARD);
+        motors[i]->run(FORWARD);
         joint_velocities[i] = max_motor_speed[i];
         if(joint_errors[i] > -0.01) {
           total_joint_errors[i] += joint_errors[i];
@@ -417,18 +418,18 @@ void moveDeltaVelocity()
       {
         int motor_speed = (int)(min((-joint_velocities[i]/ max_motor_speed[i]), 1.0) * 255.0);
         motors[i]->setSpeed(motor_speed);
-        motors[i]->run(FORWARD);
+        motors[i]->run(BACKWARD);
       }
       else if(joint_velocities[i] > 0.0)
       {
         int motor_speed = (int)(min((joint_velocities[i]/ max_motor_speed[i]), 1.0) * 255.0);
         motors[i]->setSpeed(motor_speed);
-        motors[i]->run(BACKWARD);
+        motors[i]->run(FORWARD);
       }
       else
       {
         motors[i]->setSpeed(0);
-        motors[i]->run(FORWARD);
+        motors[i]->run(RELEASE);
       }
     }
   }
