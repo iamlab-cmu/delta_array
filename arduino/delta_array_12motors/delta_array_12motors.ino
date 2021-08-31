@@ -325,9 +325,9 @@ void loop()
   sampleTime = sampleTime % 1;
 }
 
-float position_threshold = 0.00015;
-float p = 90.0;
-float i_pid = 0.25;
+float position_threshold = 0.0002;
+float p = 390.0;
+float i_pid = 0.5;
 
 float d = 0.5;
 float last_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
