@@ -44,6 +44,23 @@ class DeltaArray:
             self.ser.write(msg[i*60:(i+1)*60].encode())
             time.sleep(0.1)
 
+    def move_joint_speed_position(self, desired_joint_positions, speeds):
+
+        np.clip(desired_joint_positions,self.minimum_joint_position,self.maximum_joint_position)
+
+        combined_array = np.hstack((np.array(speeds),np.array(desired_joint_positions)))
+        num_trajectory_points = combined_array.shape[0]
+        compressed_array = np.float32(combined_array.flatten())
+        msg = '<m,' + str(num_trajectory_points) + ','
+        for number in compressed_array:
+            msg += str(round(number, 4)) + ','
+        msg = msg[:-1] + '>'
+        num_messages = int(np.ceil(len(msg) / 60.0))
+        print("MSG: "+msg)
+        for i in range(num_messages):
+            self.ser.write(msg[i*60:(i+1)*60].encode())
+            time.sleep(0.1)
+
     def move_joint_velocity(self, desired_joint_velocities, durations):
 
         combined_array = np.hstack((np.array(durations).reshape(-1,1),np.array(desired_joint_velocities)))

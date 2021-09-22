@@ -75,7 +75,7 @@ void stop(bool stop_msg){
 
 // Desired Motor Positions and Velocities (hard cap of 10 trajectory points)
 float desired_joint_positions[10][12];
-//int desired_joint_speeds[10][12]; 
+int desired_joint_speeds[10][12]; 
 float desired_joint_velocities[10][12];
 float durations[10];
 float desired_motor_speed[10];
@@ -85,7 +85,7 @@ int num_trajectory_points = 0;
 int current_trajectory_point = 0;
 bool position_trajectory = false;
 bool velocity_trajectory = false;
-
+bool speed_trajectory = false;
 // Get next command from Serial (add 1 for final 0)
 char inputString[MAX_INPUT_SIZE + 1];
 
@@ -153,6 +153,48 @@ void positionTrajectory()
 
   position_trajectory = true;
   velocity_trajectory = false;
+  speed_trajectory = false;
+  current_trajectory_point = 0;
+  last_time = 0.0;
+}
+
+// Position with Speed Trajectory
+// Stores the Position Trajectory to desired_joint_positions
+// Stores the speed for each motor to desired_joint_speeds
+void positionSpeedTrajectory()
+{
+  String received = "s ";
+
+  Serial.println(received);
+
+  char *strtokIndx; // this is used by strtok() as an index
+  
+  strtokIndx = strtok(inputString,",");      // get the first part - the string
+  strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
+  num_trajectory_points = atoi(strtokIndx);
+
+  for(int i = 0; i < num_trajectory_points; i++)
+  {
+    //read in 12 speed commands
+    for(int j = 0; j < 12; j++)
+    {
+      strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
+      desired_joint_speeds[i][j] = atof(strtokIndx);
+      received += String(desired_joint_speeds[i][j]) + " ";
+    }
+    //read in 12 position commands
+    for(int j = 0; j < 12; j++)
+    {
+      strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
+      desired_joint_positions[i][j] = atof(strtokIndx);
+      received += String(desired_joint_positions[i][j]) + " ";
+    }
+    Serial.println(received);
+  }
+
+  position_trajectory = false;
+  velocity_trajectory = false;
+  speed_trajectory = true;
   current_trajectory_point = 0;
   last_time = 0.0;
 }
@@ -179,6 +221,7 @@ void velocityTrajectory()
   }
   position_trajectory = false;
   velocity_trajectory = true;
+  speed_trajectory = false;
   current_trajectory_point = 0;
   last_time = 0.0;
 }
@@ -288,6 +331,9 @@ void loop()
       case 'v':
         velocityTrajectory();
         break;
+      case 'm':
+        positionSpeedTrajectory();
+        break;
       default:
         // do nothing
         break;
@@ -305,6 +351,10 @@ void loop()
     else if(velocity_trajectory)
     {
       moveDeltaVelocity();
+    }
+    else if(speed_trajectory)
+    {
+      moveDeltaSpeed();
     }
     checkIfDoneMovingDeltas();
   }
@@ -370,7 +420,7 @@ void moveDeltaPosition()
         if(joint_errors[i] > position_threshold)
         {
           float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
-          int motor_speed = (int)(min(max(0.0, pid), 1.0) * 255.0); //change it to use duration input
+          int motor_speed = (int)(min(max(0.0, pid), 1.0) * 255.0); 
           motors[i]->setSpeed(motor_speed);
           motors[i]->run(BACKWARD);
           joint_velocities[i] = -max_motor_speed[i];
@@ -383,6 +433,79 @@ void moveDeltaPosition()
           float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
           int motor_speed = (int)(min(max(-1.0, pid), 0.0) * -255.0);
           motors[i]->setSpeed(motor_speed);
+          motors[i]->run(FORWARD);
+          joint_velocities[i] = max_motor_speed[i];
+          if(joint_errors[i] > -0.01) {
+            total_joint_errors[i] += joint_errors[i];
+          }
+        }
+        else
+        {
+          motors[i]->setSpeed(0);
+          motors[i]->run(RELEASE);
+          joint_velocities[i] = 0.0;
+          total_joint_errors[i] = 0.0;
+        }
+      }
+    }
+  }
+  else
+  {
+    for(int i = 0; i < 12; i++)
+    {
+      if(motors[i] != NULL){
+        motors[i]->setSpeed(0);
+        motors[i]->run(RELEASE);
+        joint_velocities[i] = 0.0;
+        total_joint_errors[i] = 0.0;
+      }
+    }
+  }
+}
+
+void moveDeltaSpeed()
+{
+  bool reached_point = true;
+  for(int i = 0; i < 12; i++)
+  {
+    joint_errors[i] = joint_positions[i] - desired_joint_positions[current_trajectory_point][i];
+    if(fabs(joint_errors[i]) > position_threshold)
+    {
+      reached_point = false;
+    }
+  }
+  if(reached_point)
+  {
+    current_trajectory_point += 1;
+    for(int i = 0; i < 12; i++)
+    {
+      total_joint_errors[i] = 0.0;
+    }
+  }
+
+  float time_left = max(durations[current_trajectory_point] - last_time, 0.1);
+
+  if(current_trajectory_point < num_trajectory_points)
+  {
+    for(int i = 0; i < 12; i++)
+    {
+      if(motors[i] != NULL){
+        if(joint_errors[i] > position_threshold)
+        {
+          float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
+          //int motor_speed = (int)(min(max(0.0, pid), 1.0) * 255.0); //change it to use duration input
+          motors[i]->setSpeed((int)desired_joint_speeds[i]);
+          motors[i]->run(BACKWARD);
+          joint_velocities[i] = -max_motor_speed[i];
+          if(joint_errors[i] < 0.01) {
+            total_joint_errors[i] += joint_errors[i];
+          }
+        }
+        else if(joint_errors[i] < -position_threshold)
+        {
+          float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
+          //int motor_speed = (int)(min(max(-1.0, pid), 0.0) * -255.0);
+          motors[i]->setSpeed((int)desired_joint_speeds[i]*-1);
           motors[i]->run(FORWARD);
           joint_velocities[i] = max_motor_speed[i];
           if(joint_errors[i] > -0.01) {

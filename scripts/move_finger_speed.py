@@ -12,11 +12,11 @@ p[1, 3:6] = np.array([0.02, 0.02, 0.02])
 p[2, 3:6] = np.array([0.03, 0.03, 0.03])
 p[3, 3:6] = np.array([0.04, 0.04, 0.04])
 
-p[4, 3:6] = np.array([0.05, 0.05, 0.05])
-p[5, 3:6] = np.array([0.06, 0.06, 0.06])
-p[6, 3:6] = np.array([0.07, 0.07, 0.07])
-p[7, 3:6] = np.array([0.08, 0.08, 0.08])
-
+speeds = np.ones((8, 12)) * 0
+speeds[0, 3:6] = np.array([50, 50, 50])
+speeds[1, 3:6] = np.array([100,100,100])
+speeds[2, 3:6] = np.array([150, 150, 150])
+speeds[3, 3:6] = np.array([200,200,200])
 
 def print_posn():
     da.wait_until_done_moving()
@@ -31,10 +31,9 @@ def retract():
 
 retract()
 # print_posn()
-for i in range(0, 8): # LOOP THROUGH ALL PRESET POSITIONS
-    duration = [1.0]
+for i in range(0, 4): # LOOP THROUGH ALL PRESET POSITIONS
     print(i)
-    da.move_joint_position(p[i, :].reshape(1,12), duration)
+    da.move_joint_speed_position(p[i, :].reshape(1,12), speeds[i,:].reshape(1,12))
     da.wait_until_done_moving()
     sleep(2)
 
