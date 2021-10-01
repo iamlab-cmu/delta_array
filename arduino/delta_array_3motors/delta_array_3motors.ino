@@ -25,7 +25,8 @@ Adafruit_DCMotor *MC1_M4 = MC1.getMotor(4);
 
 // create array of pointers to motor objects
 //Adafruit_DCMotor* motors[NUM_MOTORS] = {MC0_M1, MC0_M2, MC0_M3, MC0_M4, MC1_M1, MC1_M2, MC1_M3, MC1_M4, MC2_M1, MC2_M2, MC2_M3, MC2_M4};
-Adafruit_DCMotor* motors[NUM_MOTORS] = {NULL, NULL, NULL, MC1_M1, MC1_M2, MC1_M3, MC1_M4, NULL, NULL, NULL, NULL, NULL}; //FLIPPED THE ORDER FOR M4 and M3
+Adafruit_DCMotor* motors[NUM_MOTORS] = {NULL, NULL, NULL, MC1_M1, MC1_M2, MC1_M3, NULL, NULL, NULL, NULL, NULL, NULL}; //FLIPPED THE ORDER FOR M4 and M3
+//Adafruit_DCMotor* motors[NUM_MOTORS] = {NULL, NULL, NULL, MC1_M1, MC1_M2, MC1_M4, NULL, NULL, NULL, NULL, NULL, NULL}; //FLIPPED THE ORDER FOR M4 and M3
 
 // create object to access off-board analog-to-digital converter
 Adafruit_ADS1015 ADC0;
@@ -35,6 +36,7 @@ Adafruit_ADS1015 ADC0;
 Adafruit_ADS1015* adcs[NUM_MOTORS] = {NULL, NULL, NULL, &ADC0, &ADC0, &ADC0, &ADC0, NULL, NULL, NULL, NULL, NULL};
 //Adafruit_ADS1015* adcs[NUM_MOTORS] = {&ADC0, &ADC0, &ADC0, &ADC0, &ADC1, &ADC1, &ADC1, &ADC1, &ADC2, &ADC2, &ADC2, &ADC2};
 int channels[NUM_MOTORS] = {0,0,0,3,2,1,0,0,0,0,0,0};
+//int channels[NUM_MOTORS] = {0,0,0,0,1,2,3,0,0,0,0,0};
 // Calculate based on max input size expected for one command
 #define MAX_INPUT_SIZE 900
 
@@ -134,7 +136,7 @@ void positionTrajectory()
   strtokIndx = strtok(inputString,",");      // get the first part - the string
   strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
   num_trajectory_points = atoi(strtokIndx);
-
+  Serial.println(num_trajectory_points);
   for(int i = 0; i < num_trajectory_points; i++)
   {
     strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
@@ -145,7 +147,7 @@ void positionTrajectory()
     {
       strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
       desired_joint_positions[i][j] = atof(strtokIndx);
-      received += String(desired_joint_positions[i][j]) + " ";
+      received += String(desired_joint_positions[i][j],4) + " ";
     }
 
     Serial.println(received);
@@ -194,7 +196,7 @@ void resetJoints(){
   durations[0] = 4.0;
   for(int i = 0; i < 12; i++)
   {
-    desired_joint_positions[0][i] = 0.0;
+    desired_joint_positions[0][i] = 0.002;
   }
 
   position_trajectory = true;
@@ -242,15 +244,17 @@ void updateJointPositions()
   {
     if(motors[i] != NULL){
         motor_val[i] = adcs[i]->readADC_SingleEnded(channels[i]); 
-        joint_positions[i] = motor_val[i] * 0.00006; // 100mm / 1650motors[i]->run(RELEASE);
+        joint_positions[i] = motor_val[i] * 0.00006; // 100mm / 1650 analog reading
     }
   }
 }
 
 void checkIfDoneMovingDeltas()
 {
+  
   if(current_trajectory_point > 0 && current_trajectory_point == num_trajectory_points)
   {
+    //Serial.println("checking...");
     position_trajectory = false;
     velocity_trajectory = false;
     current_trajectory_point = 0;
@@ -306,6 +310,7 @@ void loop()
     {
       moveDeltaVelocity();
     }
+    
     checkIfDoneMovingDeltas();
   }
   
@@ -331,11 +336,11 @@ void loop()
   sampleTime = sampleTime % 1;
 }
 
-float position_threshold = 0.00015;
-float p = 90.0;
-float i_pid = 0.25;
-
+float position_threshold = 0.0003; //0.15mm threshold
+float p = 390;//90.0;
+float i_pid = 0.25;//0.25;
 float d = 0.5;
+
 float last_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float total_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -345,14 +350,21 @@ void moveDeltaPosition()
   bool reached_point = true;
   for(int i = 0; i < 12; i++)
   {
-    joint_errors[i] = joint_positions[i] - desired_joint_positions[current_trajectory_point][i];
-    if(fabs(joint_errors[i]) > position_threshold)
+    if(motors[i]!=NULL)
     {
-      reached_point = false;
+      joint_errors[i] = joint_positions[i] - desired_joint_positions[current_trajectory_point][i];
+      Serial.print(joint_errors[i],4);
+      Serial.print(",");
+      if(fabs(joint_errors[i]) > position_threshold)
+      {
+        reached_point = false;
+      }
     }
   }
+  Serial.println();
   if(reached_point)
   {
+    Serial.println("reached point, onto next trajectory");
     current_trajectory_point += 1;
     for(int i = 0; i < 12; i++)
     {
@@ -374,9 +386,9 @@ void moveDeltaPosition()
           motors[i]->setSpeed(motor_speed);
           motors[i]->run(BACKWARD);
           joint_velocities[i] = -max_motor_speed[i];
-          if(joint_errors[i] < 0.01) {
-            total_joint_errors[i] += joint_errors[i];
-          }
+          //if(joint_errors[i] < 0.01) {
+          total_joint_errors[i] += joint_errors[i];
+          //}
         }
         else if(joint_errors[i] < -position_threshold)
         {
@@ -385,9 +397,9 @@ void moveDeltaPosition()
           motors[i]->setSpeed(motor_speed);
           motors[i]->run(FORWARD);
           joint_velocities[i] = max_motor_speed[i];
-          if(joint_errors[i] > -0.01) {
-            total_joint_errors[i] += joint_errors[i];
-          }
+          //if(joint_errors[i] > -0.01) {
+          total_joint_errors[i] += joint_errors[i];
+          //}
         }
         else
         {
@@ -410,7 +422,10 @@ void moveDeltaPosition()
         total_joint_errors[i] = 0.0;
       }
     }
+    Serial.println("end of all available trajectories");
+    //position_trajectory = false; //finished moving all commands
   }
+  
 }
 
 void moveDeltaVelocity()

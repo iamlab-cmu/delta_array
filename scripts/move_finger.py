@@ -37,6 +37,8 @@ for i in range(0, 8): # LOOP THROUGH ALL PRESET POSITIONS
     da.move_joint_position(p[i, :].reshape(1,12), duration)
     da.wait_until_done_moving()
     sleep(2)
+    print_posn()
+    
 
 # RESET TO FULLY RETRACTED ACTUATORS
 retract()
