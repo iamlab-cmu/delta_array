@@ -5,9 +5,9 @@
 #define NUM_MOTORS 12
 
 // Create the three motor shield object I2C address input
-Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x61); 
+Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x62); 
 Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x60); 
-Adafruit_MotorShield MC2 = Adafruit_MotorShield(0x62); 
+Adafruit_MotorShield MC2 = Adafruit_MotorShield(0x61); 
 
 // Create 12 motor objects (4 motors on 3 shields)
 Adafruit_DCMotor *MC0_M1 = MC0.getMotor(1);
@@ -24,7 +24,7 @@ Adafruit_DCMotor *MC2_M3 = MC2.getMotor(3);
 Adafruit_DCMotor *MC2_M4 = MC2.getMotor(4);
 
 // create array of pointers to motor objects
-Adafruit_DCMotor* motors[NUM_MOTORS] = {MC0_M1, MC0_M2, MC0_M3, MC0_M4, MC1_M1, MC1_M2, MC1_M3, MC1_M4, MC2_M1, MC2_M2, MC2_M3, MC2_M4};
+Adafruit_DCMotor* motors[NUM_MOTORS] = {MC0_M1, MC0_M2, MC1_M1, MC1_M2, MC2_M1, MC2_M2, MC0_M3, MC0_M4, MC1_M3, MC1_M4, MC2_M4, MC2_M3};
 //Adafruit_DCMotor* motors[NUM_MOTORS] = {MC1_M1, MC1_M2, MC1_M3, MC1_M4};
 
 // create object to access off-board analog-to-digital converter
@@ -33,8 +33,8 @@ Adafruit_ADS1015 ADC1;
 Adafruit_ADS1015 ADC2;
 
 //Adafruit_ADS1015 adcs[NUM_MOTORS] = {ADC0, ADC0, ADC0, ADC0};
-Adafruit_ADS1015* adcs[NUM_MOTORS] = {&ADC0, &ADC0, &ADC0, &ADC0, &ADC1, &ADC1, &ADC1, &ADC1, &ADC2, &ADC2, &ADC2, &ADC2};
-int channels[NUM_MOTORS] = {3,2,1,0,3,2,1,0,3,2,1,0};
+Adafruit_ADS1015* adcs[NUM_MOTORS] = {&ADC2, &ADC2, &ADC0, &ADC0, &ADC1, &ADC1, &ADC2, &ADC2, &ADC0, &ADC0, &ADC1, &ADC1};
+int channels[NUM_MOTORS] = {3,2,3,2,3,2,1,0,1,0,0,1};
 // Calculate based on max input size expected for one command
 #define MAX_INPUT_SIZE 900
 
@@ -188,7 +188,7 @@ void resetJoints(){
   durations[0] = 4.0;
   for(int i = 0; i < 12; i++)
   {
-    desired_joint_positions[0][i] = 0.0;
+    desired_joint_positions[0][i] = 0.002;
   }
 
   position_trajectory = true;
@@ -211,8 +211,8 @@ void setup()
   MC2.begin();
 
   // start all the ADCs
-  ADC0.begin(0x48);
-  ADC1.begin(0x49);
+  ADC0.begin(0x49);
+  ADC1.begin(0x48);
   ADC2.begin(0x4B);
 
   ADC0.setGain(GAIN_ONE);
@@ -325,11 +325,11 @@ void loop()
   sampleTime = sampleTime % 1;
 }
 
-float position_threshold = 0.00015;
-float p = 90.0;
+float position_threshold = 0.0003;
+float p = 390.0;
 float i_pid = 0.25;
 
-float d = 0.5;
+float d = 0.25;
 float last_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float total_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -367,9 +367,9 @@ void moveDeltaPosition()
         motors[i]->setSpeed(motor_speed);
         motors[i]->run(BACKWARD);
         joint_velocities[i] = -max_motor_speed[i];
-        if(joint_errors[i] < 0.01) {
+        //if(joint_errors[i] < 0.01) {
           total_joint_errors[i] += joint_errors[i];
-        }
+        //}
       }
       else if(joint_errors[i] < -position_threshold)
       {
@@ -378,9 +378,9 @@ void moveDeltaPosition()
         motors[i]->setSpeed(motor_speed);
         motors[i]->run(FORWARD);
         joint_velocities[i] = max_motor_speed[i];
-        if(joint_errors[i] > -0.01) {
+        //if(joint_errors[i] > -0.01) {
           total_joint_errors[i] += joint_errors[i];
-        }
+        //}
       }
       else
       {
