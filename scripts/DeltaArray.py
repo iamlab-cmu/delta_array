@@ -13,7 +13,7 @@ class DeltaArray:
         self.current_joint_positions = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.current_joint_velocities = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-        self.minimum_joint_position = 0.0015
+        self.minimum_joint_position = 0.005
         self.maximum_joint_position = 0.0988
         self.done_moving = False
 
@@ -32,7 +32,7 @@ class DeltaArray:
 
     def move_joint_position(self, desired_joint_positions, durations):
 
-        np.clip(desired_joint_positions,self.minimum_joint_position,self.maximum_joint_position)
+        desired_joint_positions = np.clip(desired_joint_positions,self.minimum_joint_position,self.maximum_joint_position)
 
         combined_array = np.hstack((np.array(durations).reshape(-1,1),np.array(desired_joint_positions)))
         num_trajectory_points = combined_array.shape[0]
@@ -41,16 +41,16 @@ class DeltaArray:
         for number in compressed_array:
             msg += str(round(number, 4)) + ','
         msg = msg[:-1] + '>'
-        num_messages = int(np.ceil(len(msg) / 60.0))
+        #num_messages = int(np.ceil(len(msg) / 60.0))
         
-        for i in range(num_messages):
-            print("outgoing message: " + msg[i*60:(i+1)*60])
-            self.ser.write(msg[i*60:(i+1)*60].encode())
-            time.sleep(0.1)
+        # for i in range(num_messages):
+        #     print("outgoing message: " + msg)
+        self.ser.write(msg.encode())
+        time.sleep(0.1)
 
     def move_joint_speed_position(self, desired_joint_positions, speeds):
 
-        np.clip(desired_joint_positions,self.minimum_joint_position,self.maximum_joint_position)
+        desired_joint_positions = np.clip(desired_joint_positions,self.minimum_joint_position,self.maximum_joint_position)
 
         combined_array = np.hstack((np.array(speeds),np.array(desired_joint_positions)))
         num_trajectory_points = combined_array.shape[0]
@@ -87,11 +87,13 @@ class DeltaArray:
     def update_joint_positions_and_velocities(self):
 
        #line = self.ser.readline() # read and throw away first incomplete line
+        
         while True:
             line = self.ser.readline() #CHANGE: test complete lines
             #print(line)
             try:
                 stringline = bytes.decode(line)
+                #print(stringline)
                 if stringline[0] == 'j':
                     numbers = np.array(stringline[2:].strip().split(','))
                     for i in range(12):
@@ -99,6 +101,8 @@ class DeltaArray:
                         self.current_joint_velocities[i] = numbers[i*2+1]
                     return False
                 elif stringline[0] == 'd':
+                    #print(stringline[0:])
+                    #breakpoint()
                     print('done')
                     self.done_moving = True
                     return True
@@ -121,6 +125,7 @@ class DeltaArray:
         start_time = time.time()
         elapsed_time = 0.0
         #pid loop is not well-tuned, timeout of 6 seconds may not be enough
+        self.ser.reset_input_buffer()
         while not self.done_moving:# and elapsed_time < timeout:
             self.done_moving = self.update_joint_positions_and_velocities()
             elapsed_time = time.time() - start_time
