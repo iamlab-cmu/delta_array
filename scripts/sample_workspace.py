@@ -32,8 +32,23 @@ def sample_domain(max_height, max_actuator_dif,spacing=.005):
                     pts.append([x,y,z])
     return np.array(pts)
 
-def save_training_data(data, filename):
-    np.save(filename,data)
+def limit_sample(sample):
+    '''
+    Get rid of redundant points in sample that have an offset of [z,z,z] 
+    from each other, the kinematics at these points can be determined in post-processing
+    '''
+
+    new_sample = []
+    for i,pt in enumerate(sample):
+        count_similar_points = np.var(1000*(sample-pt),axis=1) < 1e-5 # pure z translation
+        if np.sum(count_similar_points[:i]) < 2:
+            new_sample.append(pt)
+    return np.array(new_sample)
+
+
+
+def save_training_data(act_pos,ee_pos,ee_rot, filename):
+    np.savez(filename,act_pos=act_pos,ee_pos=ee_pos,ee_rot=ee_rot)
 
 def adjust_act_command(command):
     #Nx12 trajectory to adjust
@@ -46,7 +61,9 @@ def adjust_act_command(command):
 
     return traj
 
-sample = sample_domain(.01,.043,.003)
+sample = sample_domain(.05,.043,.005)
+
+sample = limit_sample(sample)
 
 # PRESET POSITIONS
 p = np.ones((sample.shape[0], 12)) * 0.0012
@@ -102,7 +119,9 @@ retract()
 
 print(pos_0)
 
-Data = {"act_pos":[],"ee_pos":[],"ee_rot":[]}
+act_pos = []
+ee_pos = []
+ee_rot = []
 
 # print_posn()
 for i in range(0, p.shape[0]): # LOOP THROUGH ALL PRESET POSITIONS
@@ -112,14 +131,11 @@ for i in range(0, p.shape[0]): # LOOP THROUGH ALL PRESET POSITIONS
     da.wait_until_done_moving()
     pos,rot_quat,t = op.get_closest_datapoint(time.time())
     rot = quaternion_rotation_matrix(rot_quat)
-    breakpoint()
 
-    Data["act_pos"].append(sample[i,:])
-    Data["ee_pos"].append(pos-pos_0)
-    Data["ee_rot"].append(rot_0 * rot)
-    save_training_data(np.array(Data),"training_data_rot")
-
-save_training_data(np.array(Data),"training_data_rot")
+    act_pos.append(sample[i,:])
+    ee_pos.append(rot_0@(pos-pos_0))
+    ee_rot.append(rot)
+    save_training_data(act_pos,ee_pos,ee_rot,"training_data_rot_sparse^2")
 
 # RESET TO FULLY RETRACTED ACTUATORS
 retract()
