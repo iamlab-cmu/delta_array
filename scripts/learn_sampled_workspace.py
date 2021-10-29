@@ -4,6 +4,7 @@ from Model import NN
 def load_training_data(filename):
 	data =  np.load(filename).astype(float)
 	#data[:,1,:] -= [ 0.12610888, -0.15389195,  0.26082584]
+	breakpoint()
 	data[:,1,:] -= data[0,1,:]
 	data *= 100 #convert to cm
 	return data
@@ -23,7 +24,7 @@ def train_from_file(filename):
 	#model.ik.fit()
 	return model
 
-m1 = train_from_file("training_data.npy")
+m1 = train_from_file("training_data_rot.npz.npy")
 m2 = train_from_file("training_data2.npy")
 m3 = train_from_file("training_data3.npy")
 m4 = train_from_file("training_data4.npy")
