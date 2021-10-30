@@ -23,9 +23,10 @@ Delta = Prismatic_Delta(s_p, s_b, l)
 
 # RANDOM TRAJ
 
-heights = np.array([ np.arange(0.1,5.1,.1).reshape((50,1)), np.arange(0.05,2.55,.05).reshape((50,1)), np.arange(0.1,5.1,0.1).reshape((50,1))])
+h1,h2,h3 = np.arange(0.1,5.1,.1).reshape((50,1)), np.arange(0.05,2.55,.05).reshape((50,1)), np.arange(0.1,5.1,0.1).reshape((50,1))
+heights = np.column_stack((h1,h2,h3))
 # ipdb.set_trace()
-pts = Delta.FK_Traj(heights.reshape((50,3)))
+pts = Delta.FK_Traj(heights)
 ipdb.set_trace()
 # graph pts with colormap
 fig = plt.figure()
