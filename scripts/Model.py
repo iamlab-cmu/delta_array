@@ -9,9 +9,11 @@ import numpy as np
 import config
 import random
 
+from scipy.spatial.transform import Rotation as R
+
 class NN():
-	def __init__(self,ik_save_file="./models/rigid_ik_a2c_model",fk_save_file="./models/rigid_fk_a2c_model",
-			ik_load_file="./models/rigid_ik_a2c_model",fk_load_file="./models/rigid_fk_a2c_model",load=True):
+	def __init__(self,ik_save_file,fk_save_file,
+			ik_load_file,fk_load_file,load=True):
 
 		self.fk = self.create_fk_model()
 		self.ik = self.create_ik_model()
@@ -29,84 +31,77 @@ class NN():
 		if(load):
 			self.load_all()
 
-		self.mem_buf = []
-		self.mem_size = config.MEM_SIZE 
-		self.batch_size = config.BATCH_SIZE 
-		self.train_per_ep = config.TRAIN_PER_EP
+	def mat2quat(self,rots):
+		return R.from_matrix(rots).as_quat()
+	
+	def quat2mat(self,rots):
+		return R.from_quat(rots).as_matrix()
 
-	def evaluate(self,data):
-		heights = data[:,0,:]
-		ee_poses = data[:,1,:]
+	def train_networks(self,act_pos,ee_pos,ee_rot):
+		self.train_fk(act_pos,ee_pos,ee_rot)
+		self.train_ik(act_pos,ee_pos)
 
-		fk_pred = self.predict(self.fk,heights)
-		ik_pred = self.predict(self.ik,ee_poses)
+	def train_fk(self,act_pos,ee_pos,ee_rot):
+		quat_rot = self.mat2quat(ee_rot)
+		ee = np.column_stack((ee_pos,quat_rot))
 
-		# print("fk_pred:",fk_pred[:3])
-		# print("ik_pred: ",ik_pred[:3])
-		# print("fk_ik:",self.inv_norm(self.fk(self.norm_cdf(ik_pred[:3]))))
-		# print("ee_poses:",ee_poses[:3])
-		# print("heights:",heights[:3])
-		fk_error = np.mean(np.sqrt(np.sum(np.square(ee_poses-fk_pred),axis=1)))
-		ik_error = np.mean(np.sqrt(np.sum(np.square(heights-ik_pred),axis=1)))
+		self.fk.fit(act_pos,ee,verbose=0,epochs=40)
 
-		print(" fk error ",fk_error)
-		print(" ik error ",ik_error)
+	def train_ik(self,act_pos,ee_pos):
+		'''
+		IK needs an initial guess to find the actuator position because the IK is not 1 to 1
+		This function maps ee_pos -> act_pos:
+			for the initial guess (act_pos)
+			and for the initial guesses (act_pos) + normal_dist(mean=[0,0,0],guess_std) 
+		So the network will return the ik solution that is closest to the initial guess
+		'''
+		guesses_per_sample = config.IK_GUESSES_PER_SAMPLE
+		std = config.IK_GUESS_STD
+		num_samples = len(act_pos)
 
-		print("\n-----------------------\n")
+		inp = np.zeros((guesses_per_sample*num_samples,6))
+		out = np.zeros((guesses_per_sample*num_samples,3))
+		start_ind = 0
+		for act,ee in zip(act_pos,ee_pos):
+			end_ind = start_ind + guesses_per_sample
 
-		return fk_error,ik_error
-
-
-	def train_on_batch(self,heights,ee_poses):
-		self.fk.fit(heights,ee_poses,verbose=0)
-		#self.ik.fit(ee_poses,heights,verbose=0)
-
-		with tf.GradientTape(watch_accessed_variables=False) as g:
-			g.watch(self.ik.trainable_weights)
-			ik_out = self.ik(ee_poses)
-			fk_out = self.fk(ik_out)
+			noise = np.random.normal(0,std,(guesses_per_sample,3))
 			
-			ik_loss = tf.reduce_mean(tf.keras.losses.MSE(fk_out,ee_poses))
-			ik_grads = g.gradient(ik_loss,self.ik.trainable_weights)
-		self.ik_Adam.apply_gradients(zip(ik_grads,self.ik.trainable_weights))
+			inp[start_ind:end_ind,:3] = ee
+			inp[start_ind:end_ind,3:] = noise + act
+			out[start_ind:end_ind,:] = act
 
-		# print("heights:",heights[:3])
-		# print("ee_poses:",ee_poses[:3])
+			start_ind += guesses_per_sample
 
-		# print("ik out:",ik_out[:3])
-		# print("fk out:",fk_out[:3])
-		# print("loss:" ,ik_loss)
+		self.ik.fit(inp,out,verbose=0,epochs=40)
+		# with tf.GradientTape(watch_accessed_variables=False) as g:
+		# 	g.watch(self.ik.trainable_weights)
+		# 	ik_out = self.ik(inp)
+		# 	fk_out = self.fk(ik_out)
+			
+		# 	ik_loss = tf.reduce_mean(tf.keras.losses.MSE(fk_out[:,:3],))
+		# 	ik_grads = g.gradient(ik_loss,self.ik.trainable_weights)
+		# self.ik_Adam.apply_gradients(zip(ik_grads,self.ik.trainable_weights))
 
-		# print("\n---------------------\n")
+	def predict_fk(self,act_pos):
+		pred = self.fk.predict(act_pos)
+		ee_pos = pred[:,:3]
+		ee_rot = self.quat2mat(pred[:,3:])
 
-	def train_from_mem(self):
-		if len(self.mem_buf) == 0:
-			return
-		for i in range(self.train_per_ep):
-			heights,ee_poses = self.sample_memory()
-			self.train_on_batch(heights,ee_poses)
+		return ee_pos,ee_rot
 
-
-	def predict(self,model,x):
-		x_out = model.predict(x)
-		return x_out
-
-	def remember(self,data):
-		self.mem_buf.extend(data)
-		if len(self.mem_buf) > self.mem_size:
-			self.mem_buf = self.mem_buf[len(self.mem_buf)-self.mem_size:]
-
-	def sample_memory(self,batch_size=None):
-		if batch_size is None:
-			batch_size = self.batch_size
-		batch = random.choices(self.mem_buf,k=self.batch_size)
-		batch = np.array(batch,dtype=float)
-		heights = batch[:,0,:]
-		ee_locs = batch[:,1,:]
-		return heights,ee_locs
+	def predict_ik_from_guess(self,ee_pos,ik_guess):
+		inp = np.column_stack((ee_pos,ik_guess))
+		
+		return self.ik.predict(inp)
 
 
-	def create_fk_model(self,input_dim = 3, output_dim = 3):
+	def create_fk_model(self,input_dim = 3, output_dim = 7):
+		'''
+		Maps actuator position to [ee_pos,ee_rot]
+		where ee_rot is a quaternion
+		'''
+
 		model = Sequential()
 		model.add(Dense(256, input_dim=input_dim, activation='relu'))
 		model.add(Dense(256, activation='relu'))
@@ -118,12 +113,25 @@ class NN():
 		return model
 
 
-	def create_ik_model(self,input_dim = 3, output_dim = 3):
+	def create_ik_model(self,input_dim = 6, output_dim = 3):
+		"""
+		Maps [ee_pos,ik_guess] to actuator position
+
+		The IK function is not 1 to 1, so an initial guess for the solution
+		is necessary to distinguish between ik solutions
+
+		IK does not learn an inverse for rotation because rotation is coupled with position, so the 
+		caller would have no way of specifying a correct position/rotation pair.
+		"""
+
 		model = Sequential()
 		model.add(Dense(256, input_dim=input_dim, activation='relu'))
 		model.add(Dense(256, activation='relu'))
 		model.add(Dense(256, activation='relu'))
 		model.add(Dense(output_dim, activation='linear'))
+
+		model.compile(optimizer=keras.optimizers.Adam(),
+               loss='MSE')
 
 		return model
 

@@ -1,34 +1,25 @@
+from math import e
 import numpy as np
 from Model import NN
+from examine_sample import load_training_data, get_n_to_1
 
-def load_training_data(filename):
-	data =  np.load(filename).astype(float)
-	#data[:,1,:] -= [ 0.12610888, -0.15389195,  0.26082584]
-	breakpoint()
-	data[:,1,:] -= data[0,1,:]
-	data *= 100 #convert to cm
-	return data
+fk_save_file = "./models/training_data_rot_fk_full"
+ik_save_file = "./models/training_data_rot_ik_full"
+fk_load_file = ""
+ik_load_file = ""
 
-model = NN(fk_save_file="./models/training_data1_fk",
-			ik_save_file="./models/training_data1_ik",load=False)
+files = ["training_data_rot.npz","training_data_rot_sparse.npz","training_data_rot_sparse^2.npz"]
 
-def train_from_file(filename):
-	model = NN(fk_save_file="./models/training_data1_fk",
-			ik_save_file="./models/training_data1_ik",load=False)
-	
-	data = load_training_data(filename)
-	heights = data[:,0,:]
-	ee_poses = data[:,1,:]
+model = NN(ik_save_file,fk_save_file,
+			ik_save_file,fk_save_file,load=True)
 
-	model.fk.fit(heights,ee_poses,epochs=40,verbose=0)
-	#model.ik.fit()
-	return model
+act_pos,ee_pos,ee_rot = load_training_data(files[0])
+#model.train_networks(act_pos,ee_pos,ee_rot)
+#model.save_all()
 
-m1 = train_from_file("training_data_rot.npz.npy")
-m2 = train_from_file("training_data2.npy")
-m3 = train_from_file("training_data3.npy")
-m4 = train_from_file("training_data4.npy")
+breakpoint()
 
+'''
 test_data = np.random.uniform(low=0,high=4,size=(100,3))
 e1 = m1.fk(test_data)
 e2 = m2.fk(test_data)
@@ -42,3 +33,4 @@ print("1,4:",np.mean(np.linalg.norm(e1-e4,axis=1)))
 print("3,4:",np.mean(np.linalg.norm(e3-e4,axis=1)))
 print("2,4:",np.mean(np.linalg.norm(e4-e2,axis=1)))
 
+'''
