@@ -129,6 +129,8 @@ class DeltaArray:
         while not self.done_moving:# and elapsed_time < timeout:
             self.done_moving = self.update_joint_positions_and_velocities()
             elapsed_time = time.time() - start_time
-        print(elapsed_time)
+            if elapsed_time > timeout:
+                return False
+        return True
 
             

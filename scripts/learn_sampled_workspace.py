@@ -3,8 +3,8 @@ import numpy as np
 from Model import NN
 from examine_sample import load_training_data, get_n_to_1
 
-fk_save_file = "./models/training_data_rot_fk_full"
-ik_save_file = "./models/training_data_rot_ik_full"
+fk_save_file = "./models/training_data_rot_fk_full_aug"
+ik_save_file = "./models/training_data_rot_ik_full_aug"
 fk_load_file = ""
 ik_load_file = ""
 
@@ -13,12 +13,13 @@ files = ["training_data_rot.npz","training_data_rot_sparse.npz","training_data_r
 model = NN(ik_save_file,fk_save_file,
 			ik_save_file,fk_save_file,load=True)
 
-act_pos,ee_pos,ee_rot = load_training_data(files[0])
+#act_pos,ee_pos,ee_rot = load_training_data(files[0])
 #model.train_networks(act_pos,ee_pos,ee_rot)
 #model.save_all()
 
+traj = np.linspace([0,0,2],[1,2,2],10)
+pred,valid = model.predict_ik_traj(traj)
 breakpoint()
-
 '''
 test_data = np.random.uniform(low=0,high=4,size=(100,3))
 e1 = m1.fk(test_data)

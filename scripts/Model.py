@@ -37,17 +37,64 @@ class NN():
 	def quat2mat(self,rots):
 		return R.from_quat(rots).as_matrix()
 
+	def evaluate_fk(self,act_pos,ee_pos,ee_rot):
+		ee_pos_guess,ee_rot_guess = self.predict_fk(act_pos)
+
+		pos_err = np.mean(np.linalg.norm(ee_pos-ee_pos_guess,axis=1))
+		rot_err = np.mean(abs(np.arccos(np.clip((np.trace(np.moveaxis(ee_rot_guess,2,1) @ ee_rot)-1)/2,-1,1))*360/2/np.pi))
+
+		print("FK position error (cm):",pos_err)
+		print("FK rotation error (deg):",rot_err)
+
 	def train_networks(self,act_pos,ee_pos,ee_rot):
 		self.train_fk(act_pos,ee_pos,ee_rot)
-		self.train_ik(act_pos,ee_pos)
+		self.train_ik(act_pos)
 
 	def train_fk(self,act_pos,ee_pos,ee_rot):
-		quat_rot = self.mat2quat(ee_rot)
-		ee = np.column_stack((ee_pos,quat_rot))
+		# augment data by rotating actuators/end effector by +- 120 degrees
+		# then flip actuators 2,3 to get corresponding data with the end effector
+		# flipped over the x axis
 
-		self.fk.fit(act_pos,ee,verbose=0,epochs=40)
+		n = act_pos.shape[0]
+		aug_act_pos = np.zeros((n*6,3))
+		aug_act_pos[:n,:] = act_pos
+		
+		aug_ee_pos = np.zeros((n*6,3))
+		aug_ee_rot = np.zeros((n*6,3,3))
+		aug_ee_pos[:n,:] = ee_pos
+		aug_ee_rot[:n,:] = ee_rot
 
-	def train_ik(self,act_pos,ee_pos):
+		aug_act_pos[n:2*n,:] = np.column_stack((act_pos[:,1:],act_pos[:,0]))
+		rot = R.from_rotvec([0,0,2*np.pi/3]).as_matrix()
+		aug_ee_pos[n:2*n,:] = (rot @ ee_pos.T).T
+		aug_ee_rot[n:2*n,:,:] = rot @ ee_rot
+
+		aug_act_pos[2*n:3*n,:] = np.column_stack((act_pos[:,2],act_pos[:,:2]))
+		rot = R.from_rotvec([0,0,-2*np.pi/3]).as_matrix()
+		aug_ee_pos[2*n:3*n,:] = (rot @ ee_pos.T).T
+		aug_ee_rot[2*n:3*n,:,:] = rot @ ee_rot
+
+		aug_act_pos[3*n:,:] = np.column_stack((aug_act_pos[:3*n,0],aug_act_pos[:3*n,2],aug_act_pos[:3*n,1]))
+		rot = np.eye(3)
+		rot[0,0]=-1 #flip over x axis
+		aug_ee_pos[3*n:,:] = (rot @ aug_ee_pos[:3*n,:].T).T
+		aug_ee_rot[3*n:,:,:] = rot @ aug_ee_rot[:3*n,:,:]
+
+		aug_ee_pos_final = np.zeros_like(aug_ee_pos)
+		for i in range(6*n):
+			close_mask = np.isclose(np.linalg.norm(aug_act_pos-aug_act_pos[i],axis=1),0)
+			aug_ee_pos_final[close_mask,:] = np.mean(aug_ee_pos[close_mask,:],axis=0)
+
+		unique_mask = np.unique(aug_ee_pos_final,axis=0,return_index=True)[1]
+		aug_act_pos = aug_act_pos[unique_mask]
+		aug_ee_pos_final = aug_ee_pos_final[unique_mask]
+		aug_ee_rot = aug_ee_rot[unique_mask]
+
+		aug_ee = np.column_stack((aug_ee_pos_final,self.mat2quat(aug_ee_rot)))
+
+		self.fk.fit(aug_act_pos,aug_ee,verbose=1,epochs=15)
+
+	def train_ik(self,act_pos):
 		'''
 		IK needs an initial guess to find the actuator position because the IK is not 1 to 1
 		This function maps ee_pos -> act_pos:
@@ -62,6 +109,10 @@ class NN():
 		inp = np.zeros((guesses_per_sample*num_samples,6))
 		out = np.zeros((guesses_per_sample*num_samples,3))
 		start_ind = 0
+
+		# use fk to predict rather than using data directly
+		# because data has been 'improved' by data augmentation
+		ee_pos = self.predict_fk(act_pos)[0] 
 		for act,ee in zip(act_pos,ee_pos):
 			end_ind = start_ind + guesses_per_sample
 
@@ -73,7 +124,7 @@ class NN():
 
 			start_ind += guesses_per_sample
 
-		self.ik.fit(inp,out,verbose=0,epochs=40)
+		self.ik.fit(inp,out,verbose=0,epochs=20)
 		# with tf.GradientTape(watch_accessed_variables=False) as g:
 		# 	g.watch(self.ik.trainable_weights)
 		# 	ik_out = self.ik(inp)
@@ -90,10 +141,75 @@ class NN():
 
 		return ee_pos,ee_rot
 
-	def predict_ik_from_guess(self,ee_pos,ik_guess):
+	def predict_ik(self,ee_pos,ik_guess=None):
+		if ik_guess is None:
+			return self.predict_ik_without_guess(ee_pos)
 		inp = np.column_stack((ee_pos,ik_guess))
 		
 		return self.ik.predict(inp)
+
+	def predict_ik_without_guess(self,ee_pos):
+		'''
+		Args:
+			ee_pos: N x 3 array of end effector positions 
+
+		Correct guess is known along the line [0,0,z] (it is [z,z,z])
+
+		Start from closest point on [0,0,z] and step by ~.2 cm at a time until ee_pos
+			is reached using each solution for point i as the guess for point i+1
+		'''
+
+		easy_pos = np.zeros(ee_pos.shape)
+		easy_pos[:,2] = ee_pos[:,2]
+		easy_guess = (ee_pos[:,2]*np.ones(ee_pos.shape).T).T
+
+		max_dist = np.max(abs(ee_pos[:,:2]))
+		num_pts = int((max_dist/.2)) + 1
+		traj = np.linspace(easy_pos,ee_pos,num_pts)
+
+		curr_guess = easy_guess
+		for t in traj:
+			pred = self.predict_ik(t,curr_guess)
+			curr_guess = pred
+		
+		return curr_guess
+
+	def predict_ik_traj(self,traj,mask_tolerance=.3):
+		'''
+		Args:
+			traj: Nx3 trajectory of desired end effector positions for Delta
+			mask_tolerance : see returned Valid_Mask
+
+			Both args are in cm
+
+		Returns 
+			IK: Nx3 inverse kinematic result for each point in trajectory
+			Valid_Mask: N x 1 mask, False where FK(IK) != traj (outside mask_tolerance)
+
+		The IK for each point in the trajectory is used as the guess for the next point
+			unless traj[i] is more than .3 cm from traj[i+1] or valid_mask[i] == False
+		'''
+
+		IK = []
+		Valid_Mask = []
+
+		curr_guess = None
+		last_pt = None
+		for pt in traj:
+			if last_pt is not None and np.linalg.norm(pt-last_pt) > .3:
+				curr_guess = None
+			curr_guess = self.predict_ik(np.expand_dims(pt,0),ik_guess=curr_guess)
+			IK.append(curr_guess)
+			f,_ = self.predict_fk(curr_guess)
+			if np.linalg.norm(f-pt) > mask_tolerance:
+				Valid_Mask.append(False)
+				curr_guess = None
+			else:
+				Valid_Mask.append(True)
+			last_pt = pt
+		
+
+		return np.array(IK).squeeze(),np.array(Valid_Mask)
 
 
 	def create_fk_model(self,input_dim = 3, output_dim = 7):
