@@ -1,24 +1,17 @@
 from Prismatic_Delta import Prismatic_Delta
 from Model import NN
-from DeltaArray import DeltaArray
-from OptiTrackStreaming.DataStreamer import OptiTrackDataStreamer
 import numpy as np
+from delta_utils import record_trajectory, initialize_array_recording, close_all
 
-def goto_position(self,da,pos,timeout=6):
-    act_cmd = np.zeros((1,12))
-    act_cmd[0,3:6] = pos
-    act_cmd = adjust_act_command(act_cmd)
-    da.move_joint_position(act_cmd, [1.])
-    return da.wait_until_done_moving(timeout=timeout)
 
-fk_save_file = "./models/training_data_rot_fk_full_aug"
-ik_save_file = "./models/training_data_rot_ik_full_aug"
+fk_save_file = "./models/training_data_rot_fk_full_aug_op_up.h5"
+ik_save_file = "./models/training_data_rot_ik_full_aug_op_up.h5"
 
 aug_model = NN(ik_save_file,fk_save_file,
 			ik_save_file,fk_save_file,load=True)
 
-fk_save_file = "./models/training_data_rot_fk_full"
-ik_save_file = "./models/training_data_rot_ik_full"
+fk_save_file = "./models/training_data_rot_fk_full_base_op_up.h5"
+ik_save_file = "./models/training_data_rot_ik_full_base_op_up.h5"
 
 base_model = NN(ik_save_file,fk_save_file,
 			ik_save_file,fk_save_file,load=True)
@@ -35,20 +28,45 @@ num_rad_steps = 30
 step_size = .5  #cm in radial direction
 max_spiral_width = 4.6 #cm determined experimentally
 
-for step in np.arange(step_size,4.6,step_size):
-    for rad in np.linspace(0,2*pi,num=num_rad_steps,endpoint=False):
-        pt = [step*np.cos(rad),step*np.sin(rad),traj_height]
-        if rigid_Delta.is_valid(pt,4.3):
+#rigid IK has origin at the base of the Delta
+# move origin to Delta position for input [0,0,0]
+rigid_ik_offset = rigid_Delta.FK([0,0,0])[0,2]
+
+rigid_ik = [rigid_Delta.IK([0,0,traj_height+rigid_ik_offset])]
+
+for step in np.arange(1,4.6,step_size):
+    for rad in np.linspace(0,2*np.pi,num=num_rad_steps,endpoint=False):
+        pt = np.array([step*np.cos(rad),step*np.sin(rad),traj_height])
+        offset_pt = pt + [0,0,rigid_ik_offset] 
+        if rigid_Delta.is_valid(offset_pt,4.3):
             spiral_traj.append(pt)
+            rigid_ik.append(rigid_Delta.IK(offset_pt))
 
-sprial_traj = np.array(spiral_traj)
+spiral_traj = np.array(spiral_traj)
 
-rigid_ik = Delta.IK_Traj(sprial_traj)
-base_ik,base_valid = base_model.predict_ik_traj(spiral_traj)
-aug_ik,aug_valid = aug_model.predict_ik_traj(spiral_traj)
+rigid_ik = np.array(rigid_ik)
+base_ik,base_valid = base_model.predict_ik(spiral_traj,return_valid_mask=True)
+aug_ik,aug_valid = aug_model.predict_ik(spiral_traj,return_valid_mask=True)
 
-breakpoint()
+valid_mask = base_valid & aug_valid
+
+rigid_ik = rigid_ik[valid_mask]
+base_ik = base_ik[valid_mask]
+aug_ik = aug_ik[valid_mask]
+
+da,op = initialize_array_recording()
+
+act_pos_rigid, ee_pos_rigid, ee_rot_rigid = record_trajectory(da,op,rigid_ik)
+act_pos_base, ee_pos_base, ee_rot_base = record_trajectory(da,op,base_ik)
+act_pos_aug, ee_pos_aug, ee_rot_aug = record_trajectory(da,op,aug_ik)
 
 
+save_file = "Delta_2_Kinematic_Test_op_up"
+np.savez(save_file,
+    act_pos_rigid = act_pos_rigid,ee_pos_rigid=ee_pos_rigid,ee_rot_rigid=ee_rot_rigid,
+    act_pos_base = act_pos_base,ee_pos_base=ee_pos_base,ee_rot_base=ee_rot_base,
+    act_pos_aug = act_pos_aug,ee_pos_aug=ee_pos_aug,ee_rot_aug=ee_rot_aug,
+    traj = spiral_traj)
 
-    
+
+close_all(da,op)

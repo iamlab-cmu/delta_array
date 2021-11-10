@@ -1,11 +1,8 @@
 from scipy.io import savemat
 import numpy as np
-import glob
-import os
-npzFiles = glob.glob("*.npy")
-for f in npzFiles:
-    fm = os.path.splitext(f)[0]+'.mat'
-    data = np.load(f)
-    d = {"training_data":data}
-    savemat(fm, d)
-    print('generated ', fm, 'from', f)
+
+file_name = "Delta_1_Kinematic_Test_op_up"
+
+D = np.load(file_name+".npz")
+
+savemat(file_name + ".mat",mdict={key:D[key] for key in D})

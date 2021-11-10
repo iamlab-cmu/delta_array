@@ -1,8 +1,7 @@
 import tensorflow.keras as keras
 import tensorflow as tf
-from tensorflow.keras.models import Model
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense,Activation,BatchNormalization
+from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Input
 from tensorflow.keras.models import load_model
 import numpy as np 
@@ -50,47 +49,57 @@ class NN():
 		self.train_fk(act_pos,ee_pos,ee_rot)
 		self.train_ik(act_pos)
 
-	def train_fk(self,act_pos,ee_pos,ee_rot):
+	def train_fk(self,act_pos,ee_pos,ee_rot,augment_data=False):
 		# augment data by rotating actuators/end effector by +- 120 degrees
 		# then flip actuators 2,3 to get corresponding data with the end effector
 		# flipped over the x axis
 
-		n = act_pos.shape[0]
-		aug_act_pos = np.zeros((n*6,3))
-		aug_act_pos[:n,:] = act_pos
-		
-		aug_ee_pos = np.zeros((n*6,3))
-		aug_ee_rot = np.zeros((n*6,3,3))
-		aug_ee_pos[:n,:] = ee_pos
-		aug_ee_rot[:n,:] = ee_rot
+		if augment_data:
+			n = act_pos.shape[0]
+			aug_act_pos = np.zeros((n*6,3))
+			aug_act_pos[:n,:] = act_pos
+			
+			aug_ee_pos = np.zeros((n*6,3))
+			aug_ee_rot = np.zeros((n*6,3,3))
+			aug_ee_pos[:n,:] = ee_pos
+			aug_ee_rot[:n,:] = ee_rot
 
-		aug_act_pos[n:2*n,:] = np.column_stack((act_pos[:,1:],act_pos[:,0]))
-		rot = R.from_rotvec([0,0,2*np.pi/3]).as_matrix()
-		aug_ee_pos[n:2*n,:] = (rot @ ee_pos.T).T
-		aug_ee_rot[n:2*n,:,:] = rot @ ee_rot
+			aug_act_pos[n:2*n,:] = np.column_stack((act_pos[:,1:],act_pos[:,0]))
+			rot = R.from_rotvec([0,0,2*np.pi/3]).as_matrix()
+			aug_ee_pos[n:2*n,:] = (rot @ ee_pos.T).T
+			aug_ee_rot[n:2*n,:,:] = rot @ ee_rot
 
-		aug_act_pos[2*n:3*n,:] = np.column_stack((act_pos[:,2],act_pos[:,:2]))
-		rot = R.from_rotvec([0,0,-2*np.pi/3]).as_matrix()
-		aug_ee_pos[2*n:3*n,:] = (rot @ ee_pos.T).T
-		aug_ee_rot[2*n:3*n,:,:] = rot @ ee_rot
+			aug_act_pos[2*n:3*n,:] = np.column_stack((act_pos[:,2],act_pos[:,:2]))
+			rot = R.from_rotvec([0,0,-2*np.pi/3]).as_matrix()
+			aug_ee_pos[2*n:3*n,:] = (rot @ ee_pos.T).T
+			aug_ee_rot[2*n:3*n,:,:] = rot @ ee_rot
 
-		aug_act_pos[3*n:,:] = np.column_stack((aug_act_pos[:3*n,0],aug_act_pos[:3*n,2],aug_act_pos[:3*n,1]))
-		rot = np.eye(3)
-		rot[0,0]=-1 #flip over x axis
-		aug_ee_pos[3*n:,:] = (rot @ aug_ee_pos[:3*n,:].T).T
-		aug_ee_rot[3*n:,:,:] = rot @ aug_ee_rot[:3*n,:,:]
+			aug_act_pos[3*n:,:] = np.column_stack((aug_act_pos[:3*n,0],aug_act_pos[:3*n,2],aug_act_pos[:3*n,1]))
+			rot = np.eye(3)
+			rot[0,0]=-1 #flip over x axis
+			aug_ee_pos[3*n:,:] = (rot @ aug_ee_pos[:3*n,:].T).T
+			aug_ee_rot[3*n:,:,:] = rot @ aug_ee_rot[:3*n,:,:]
 
-		aug_ee_pos_final = np.zeros_like(aug_ee_pos)
-		for i in range(6*n):
-			close_mask = np.isclose(np.linalg.norm(aug_act_pos-aug_act_pos[i],axis=1),0)
-			aug_ee_pos_final[close_mask,:] = np.mean(aug_ee_pos[close_mask,:],axis=0)
+			aug_ee_pos_final = np.zeros_like(aug_ee_pos)
+			for i in range(6*n):
+				close_mask = np.isclose(np.linalg.norm(aug_act_pos-aug_act_pos[i],axis=1),0)
+				aug_ee_pos_final[close_mask,:] = np.mean(aug_ee_pos[close_mask,:],axis=0)
 
-		unique_mask = np.unique(aug_ee_pos_final,axis=0,return_index=True)[1]
-		aug_act_pos = aug_act_pos[unique_mask]
-		aug_ee_pos_final = aug_ee_pos_final[unique_mask]
-		aug_ee_rot = aug_ee_rot[unique_mask]
+			unique_mask = np.unique(aug_ee_pos_final,axis=0,return_index=True)[1]
 
-		aug_ee = np.column_stack((aug_ee_pos_final,self.mat2quat(aug_ee_rot)))
+			aug_act_pos = aug_act_pos[unique_mask]
+			aug_ee_pos_final = aug_ee_pos_final[unique_mask]
+			aug_ee_rot = aug_ee_rot[unique_mask]
+
+			for i in range(len(aug_act_pos)):
+				act_pos = aug_act_pos[i]
+				if np.allclose(act_pos,act_pos[0]):
+					aug_ee_pos_final[i] = [0,0,act_pos[0]]
+
+			aug_ee = np.column_stack((aug_ee_pos_final,self.mat2quat(aug_ee_rot)))
+		else:
+			aug_ee = np.column_stack((ee_pos,self.mat2quat(ee_rot)))
+			aug_act_pos = act_pos
 
 		self.fk.fit(aug_act_pos,aug_ee,verbose=1,epochs=15)
 
@@ -124,15 +133,7 @@ class NN():
 
 			start_ind += guesses_per_sample
 
-		self.ik.fit(inp,out,verbose=0,epochs=20)
-		# with tf.GradientTape(watch_accessed_variables=False) as g:
-		# 	g.watch(self.ik.trainable_weights)
-		# 	ik_out = self.ik(inp)
-		# 	fk_out = self.fk(ik_out)
-			
-		# 	ik_loss = tf.reduce_mean(tf.keras.losses.MSE(fk_out[:,:3],))
-		# 	ik_grads = g.gradient(ik_loss,self.ik.trainable_weights)
-		# self.ik_Adam.apply_gradients(zip(ik_grads,self.ik.trainable_weights))
+		self.ik.fit(inp,out,verbose=1,epochs=20)
 
 	def predict_fk(self,act_pos):
 		pred = self.fk.predict(act_pos)
@@ -141,12 +142,20 @@ class NN():
 
 		return ee_pos,ee_rot
 
-	def predict_ik(self,ee_pos,ik_guess=None):
+	def predict_ik(self,ee_pos,ik_guess=None, valid_tol = .3, return_valid_mask=False):
 		if ik_guess is None:
-			return self.predict_ik_without_guess(ee_pos)
-		inp = np.column_stack((ee_pos,ik_guess))
+			ik_pred = self.predict_ik_without_guess(ee_pos)
+		else:
+			inp = np.column_stack((ee_pos,ik_guess))
+			ik_pred = self.ik.predict(inp)
+
+		if not return_valid_mask:
+			return ik_pred
+
+		fk_pred = self.predict_fk(ik_pred)[0]
+		valid_mask = np.linalg.norm(fk_pred-ee_pos,axis=1) < valid_tol
 		
-		return self.ik.predict(inp)
+		return ik_pred,valid_mask
 
 	def predict_ik_without_guess(self,ee_pos):
 		'''
@@ -282,3 +291,23 @@ class NN():
 					idx += 1
 		pred = self.predict(self.fk,heights)
 		return pred
+
+	
+	def get_random_traj()
+
+	def learn_online(self,da,op,rigid_Delta,max_rad,z_des):
+		from delta_utils import record_trajectory
+
+
+		rads = np.random.uniform(0,max_rad,200)
+		angles = np.random.uniform(0,2*np.pi,200)
+		c = np.cos(angles)
+		s = np.sin(angles)
+
+		pts = np.column_stack((rads*c,rads*s,np.ones(200)*z_des))
+
+		while True:
+
+
+
+		

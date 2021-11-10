@@ -31,11 +31,11 @@ class Prismatic_Delta:
         self.u_b = math.sqrt(3) * s_b / 3
 
         u_b = math.sqrt(3) * s_b / 3
-        self.base1 = np.array([[0, u_b, 0]])
+        self.base1 = np.array([0, u_b, 0])
         a2 = -math.pi / 6
-        self.base2 = np.array([[u_b * math.cos(a2), u_b * math.sin(a2), 0]])
+        self.base2 = np.array([u_b * math.cos(a2), u_b * math.sin(a2), 0])
         a3 = 7 * math.pi / 6
-        self.base3 = np.array([[u_b * math.cos(a3), u_b * math.sin(a3), 0]])
+        self.base3 = np.array([u_b * math.cos(a3), u_b * math.sin(a3), 0])
 
     def get_base_verteces(self, offset, rotation):
         bv1 = np.transpose((rotation * np.transpose(self.base1))) + offset
@@ -45,22 +45,22 @@ class Prismatic_Delta:
 
     def get_knee_joints(self, heights, offset, rotation):
         [bv1, bv2, bv3] = self.get_base_verteces(offset, rotation)
-        kj1 = bv1 + np.array([[0, 0, heights[0]]])
-        kj2 = bv2 + np.array([[0, 0, heights[1]]])
-        kj3 = bv3 + np.array([[0, 0, heights[2]]])
+        kj1 = bv1 + np.array([0, 0, heights[0]])
+        kj2 = bv2 + np.array([0, 0, heights[1]])
+        kj3 = bv3 + np.array([0, 0, heights[2]])
         return [kj1, kj2, kj3]
 
     def get_platform_verteces(self, pt, offset, rotation):
         u_p = self.u_p
-        c1 = pt + np.array([[0, u_p, 0]])
+        c1 = pt + np.array([0, u_p, 0])
         a2 = -math.pi / 6
-        c2 = pt + np.array([[u_p * math.cos(a2), u_p * math.sin(a2), 0]])
+        c2 = pt + np.array([u_p * math.cos(a2), u_p * math.sin(a2), 0])
         a3 = 7 * math.pi / 6
-        c3 = pt + np.array([[u_p * math.cos(a3), u_p * math.sin(a3), 0]])
+        c3 = pt + np.array([u_p * math.cos(a3), u_p * math.sin(a3), 0])
 
         pv1 = np.tranpose(rotation * np.transpose(c1)) + offset
-        pv2 = np.tranpose(rotation * np.transpose(c1)) + offset
-        pv3 = np.tranpose(rotation * np.transpose(c1)) + offset
+        pv2 = np.tranpose(rotation * np.transpose(c2)) + offset
+        pv3 = np.tranpose(rotation * np.transpose(c3)) + offset
 
         return [pv1, pv2, pv3]
 
@@ -82,7 +82,7 @@ class Prismatic_Delta:
 
         for row in range(len(pts)):
             pt = pts[row]
-            [pv1, pv2, pv3] = self.get_platform_verteces(pt, np.array([[0, 0, 0]]), np.identity(
+            [pv1, pv2, pv3] = self.get_platform_verteces(pt, np.array([0, 0, 0]), np.identity(
                 3))  # was rotz(0), but this is same as identity
             plat_verts = np.concatenate((pv1, pv2, pv3))
 
@@ -113,29 +113,29 @@ class Prismatic_Delta:
         h = self.IK(pt)
 
         # not imaginary and not above max height
-        is_valid = sum(h < min_height) + sum(h > max_height) == 0 and sum(h == abs(h)) == 3
+        is_valid = np.sum(h < min_height) + np.sum(h > max_height) == 0 and np.sum(h == abs(h)) == 3
         return is_valid
 
     def IK(self, position):
         # find corners of ee platform
         u_p = self.u_p
-        c1 = position + np.array([[0, u_p, 0]])
+        c1 = position + np.array([0, u_p, 0])
         a2 = -math.pi / 6
-        c2 = position + np.array([[u_p * math.cos(a2), u_p * math.sin(a2), 0]])
+        c2 = position + np.array([u_p * math.cos(a2), u_p * math.sin(a2), 0])
         a3 = 7 * math.pi / 6
-        c3 = position + np.array([[u_p * math.cos(a3), u_p * math.sin(a3), 0]])
+        c3 = position + np.array([u_p * math.cos(a3), u_p * math.sin(a3), 0])
 
         # squared dist to prismatic actuator axis
-        d1 = sum(np.power(c1[0:2] - self.base1[0:2], 2))
-        d2 = sum(np.power(c2[0:2] - self.base2[0:2], 2))
-        d3 = sum(np.power(c3[0:2] - self.base3[0:2], 2))
+        d1 = np.sum(np.power(c1[0:2] - self.base1[0:2], 2))
+        d2 = np.sum(np.power(c2[0:2] - self.base2[0:2], 2))
+        d3 = np.sum(np.power(c3[0:2] - self.base3[0:2], 2))
 
         l = self.l ** 2
-        h1 = position[2] - math.sqrt(l - d1)
-        h2 = position[3] - math.sqrt(l - d2)
-        h3 = position[3] - math.sqrt(l - d3)
+        h1 = position[2] - np.emath.sqrt(l - d1)
+        h2 = position[2] - np.emath.sqrt(l - d2)
+        h3 = position[2] - np.emath.sqrt(l - d3)
 
-        heights = [h1, h2, h3]
+        heights = np.array([h1, h2, h3])
         return heights
 
     def IK_Traj(self, trajectory):
@@ -289,15 +289,15 @@ class Prismatic_Delta:
             pos = 1 # default value
         # import ipdb
         # ipdb.set_trace()
-        x1 = X1[0,0]
-        y1 = X1[0,1]
-        z1 = X1[0,2]
-        x2 = X2[0,0]
-        y2 = X2[0,1]
-        z2 = X2[0,2]
-        x3 = X3[0,0]
-        y3 = X3[0,1]
-        z3 = X3[0,2]
+        x1 = X1[0]
+        y1 = X1[1]
+        z1 = X1[2]
+        x2 = X2[0]
+        y2 = X2[1]
+        z2 = X2[2]
+        x3 = X3[0]
+        y3 = X3[1]
+        z3 = X3[2]
         # convert in coord sys at [x1 y1 z1] oriented same as global
         # x2 = 1
         # y2 = 1

@@ -11,7 +11,7 @@ def load_training_data(filename, discard_flipped_ax = True):
 	if discard_flipped_ax:
 		act_pos,ee_pos,ee_rot = discard_flipped_axes(act_pos,ee_pos,ee_rot)
 
-	return 100*act_pos,100*ee_pos,ee_rot
+	return act_pos,100*ee_pos,ee_rot
 
 def get_n_to_1(act_pos,ee_pos,ee_rot,num_samples = None):
 	'''
