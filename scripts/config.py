@@ -1,8 +1,8 @@
 import numpy as np
 
 ############### Actuator Config ####################
-MAX_ACTUATOR_HEIGHT = .043 #m
-MIN_ACTUATOR_HEIGHT = .005 #m
+MAX_ACTUATOR_HEIGHT = 4.3 #cm
+MIN_ACTUATOR_HEIGHT = .5 #cm
 
 ACTUATOR_ARDUINO_PORT = "/dev/cu.usbmodem14201" 
 
@@ -13,6 +13,7 @@ BATCH_SIZE = 64
 MEM_SIZE = 500000
 TRAIN_PER_EP = 50
 TRAINING_EPOCHS = 200
+NUM_POINTS_PER_EP = 10
 
 #Add random noise around initial guesses when training IK
 IK_GUESS_STD = .2

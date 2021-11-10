@@ -45,7 +45,9 @@ def get_n_to_1(act_pos,ee_pos,ee_rot,num_samples = None):
 		#less than 5 degrees difference in the rotation matrices
 		close_rot_mask = np.arccos(np.clip((np.trace(ee_rot @ ee_rot[i].T,axis1=1,axis2=2)-1)/2,-1,1))*360/2/np.pi < 5
 
-		close_mask = close_pos_mask & close_rot_mask
+		far_act_pos_mask = np.linalg.norm(act_pos-act_pos[i],axis=1) > .01
+
+		close_mask = close_pos_mask & close_rot_mask & far_act_pos_mask
 
 		if np.sum(close_mask) > 1:
 			aliasing_act_poses.append(act_pos[close_mask])
@@ -89,8 +91,10 @@ if __name__ == "__main__":
 
 	a2,b2,c2 = load_training_data(files[2])
 
-	poses,masks = check_121(a,b,c,num_samples=10)
+	poses,masks = get_n_to_1(a,b,c,num_samples=10)
+	breakpoint()
 
-	pos_err,rot_err = check_data_match(a,b,c,a1,b1,c1)
 
-	pos_err,rot_err = check_data_match(a2,b2,c2,a1,b1,c1)
+	#pos_err,rot_err = check_data_match(a,b,c,a1,b1,c1)
+
+	#pos_err,rot_err = check_data_match(a2,b2,c2,a1,b1,c1)

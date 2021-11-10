@@ -44,8 +44,9 @@ def goto_position(da,pos,timeout=6):
     da.move_joint_position(act_cmd, [1.])
     return da.wait_until_done_moving(timeout=timeout)
 
-def record_trajectory(da,op,heights):
-    pos_0,rot_0 = center_delta(da,op)
+def record_trajectory(da,op,heights,pos_0=None,rot_0=None):
+    if pos_0 is None or rot_0 is None:
+        pos_0,rot_0 = center_delta(da,op)
 
     _,rot_quat,_ = op.get_closest_datapoint(time.time())
     start_rot = quaternion_rotation_matrix(rot_quat)

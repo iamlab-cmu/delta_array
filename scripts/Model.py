@@ -238,7 +238,7 @@ class NN():
 		return model
 
 
-	def create_ik_model(self,input_dim = 6, output_dim = 3):
+	def create_ik_model(self,input_dim = 3, output_dim = 3):
 		"""
 		Maps [ee_pos,ik_guess] to actuator position
 
@@ -293,20 +293,58 @@ class NN():
 		return pred
 
 	
-	def get_random_traj()
-
-	def learn_online(self,da,op,rigid_Delta,max_rad,z_des):
-		from delta_utils import record_trajectory
-
-
-		rads = np.random.uniform(0,max_rad,200)
-		angles = np.random.uniform(0,2*np.pi,200)
+	def get_points_on_circle(self,num_pts,max_rad,z_des):
+		rads = np.random.uniform(0,max_rad,num_pts)
+		angles = np.random.uniform(0,2*np.pi,num_pts)
 		c = np.cos(angles)
 		s = np.sin(angles)
 
-		pts = np.column_stack((rads*c,rads*s,np.ones(200)*z_des))
+		pts = np.column_stack((rads*c,rads*s,np.ones(num_pts)*z_des))
+		return pts
+	
+	def sample_mem_buf(self,mem_buf):
+		num_samples = min(len(mem_buf,config.BATCH_SIZE))
+		d = np.random.choice(mem_buf,num_samples,replace=False)
+		act_pos,ee_pos,ee_rot,goal_pos = list(zip(*d))
+		return act_pos,ee_pos,ee_rot,goal_pos
 
-		while True:
+	def train_on_batch(self,mem_buf):
+		act_pos,ee_pos,ee_rot,goal_pos = self.sample_mem_buf(mem_buf)
+		ee = np.column_stack((ee_pos,self.mat2quat(ee_rot)))
+		self.fk.fit(act_pos,ee,epochs=1,verbose=1)
+
+		with tf.GradientTape(watch_accessed_variables=False) as g:
+			g.watch(self.ik.trainable_weights)
+			ik_in = np.column_stack(goal_pos) 
+			ik_out = self.ik(ik_in)
+			fk_out = self.fk(ik_out)[:,:3]
+			
+			ik_loss = tf.reduce_mean(tf.keras.losses.MSE(fk_out,goal_pos))
+			ik_grads = g.gradient(ik_loss,self.ik.trainable_weights)
+		self.ik_Adam.apply_gradients(zip(ik_grads,self.ik.trainable_weights))
+
+
+	def learn_online(self,da,op,max_rad,z_des):
+		from delta_utils import record_trajectory, center_delta
+		
+		pos_0, rot_0 = center_delta(da,op)
+		mem_buf = []
+		for epoch in config.TRAINING_EPOCHS:
+			pts = self.get_points_on_circle(config.NUM_POINTS_PER_EP,max_rad,z_des)
+			ik_pts = self.predict_ik(pts)
+
+			########### TODO figure out difference in ee rot #############################
+			act_poses,ee_poses,ee_rots = record_trajectory(da,op,ik_pts,pos_0=pos_0,rot_0=rot_0)
+
+			print("Trajectory Error:",np.mean(np.linalg.norm(ee_poses-pts)))
+
+			mem_buf.extend(list(zip(act_poses,ee_poses,ee_rots,pts)))
+
+			self.train_on_batch(mem_buf)
+
+
+
+
 
 
 
