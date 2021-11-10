@@ -1,9 +1,9 @@
 import numpy as np
 import time
-from math_util import quaternion_rotation_matrix
 from DeltaArray import DeltaArray
 from OptiTrackStreaming.DataStreamer import OptiTrackDataStreamer
 import config
+from scipy.spatial.transform import Rotation as R
 
 def initialize_array_recording():
     da = DeltaArray('COM3')
@@ -47,9 +47,11 @@ def goto_position(da,pos,timeout=6):
 def record_trajectory(da,op,heights,pos_0=None,rot_0=None):
     if pos_0 is None or rot_0 is None:
         pos_0,rot_0 = center_delta(da,op)
+    else:
+        retract(da)
 
     _,rot_quat,_ = op.get_closest_datapoint(time.time())
-    start_rot = quaternion_rotation_matrix(rot_quat)
+    start_rot = R.from_quat(rot_quat).as_matrix()
 
     act_pos = []
     ee_pos = []
@@ -59,11 +61,11 @@ def record_trajectory(da,op,heights,pos_0=None,rot_0=None):
         print(100*i/len(heights),"\%")
         goto_position(da,height)
         pos,rot_quat,t = op.get_closest_datapoint(time.time())
-        rot = quaternion_rotation_matrix(rot_quat)
+        rot = R.from_quat(rot_quat).as_matrix()
 
         act_pos.append(height)
         ee_pos.append(rot_0 @ (pos-pos_0))
-        ee_rot.append(start_rot.T @ rot)
+        ee_rot.append(R.from_matrix(start_rot.T @ rot).as_quat())
 
     retract(da)
     return np.array(act_pos),np.array(ee_pos),np.array(ee_rot)

@@ -310,7 +310,7 @@ class NN():
 
 	def train_on_batch(self,mem_buf):
 		act_pos,ee_pos,ee_rot,goal_pos = self.sample_mem_buf(mem_buf)
-		ee = np.column_stack((ee_pos,self.mat2quat(ee_rot)))
+		ee = np.column_stack((ee_pos,ee_rot))
 		self.fk.fit(act_pos,ee,epochs=1,verbose=1)
 
 		with tf.GradientTape(watch_accessed_variables=False) as g:
@@ -321,19 +321,28 @@ class NN():
 			
 			ik_loss = tf.reduce_mean(tf.keras.losses.MSE(fk_out,goal_pos))
 			ik_grads = g.gradient(ik_loss,self.ik.trainable_weights)
+
 		self.ik_Adam.apply_gradients(zip(ik_grads,self.ik.trainable_weights))
 
 
-	def learn_online(self,da,op,max_rad,z_des):
+	def learn_online(self,da,op,max_rad,z_des,rigid_delta):
 		from delta_utils import record_trajectory, center_delta
 		
 		pos_0, rot_0 = center_delta(da,op)
 		mem_buf = []
+
+		pre_train_pts = self.get_points_on_circle(200,max_rad,z_des)
+		rigid_ik = rigid_delta.IK_traj(pre_train_pts)
+		rots = np.column_stack((np.zeros((200,3)),np.ones((200,1))))
+		print("Pretraining with Rigid Kinematics")
+		self.fk.fit(rigid_ik,np.column_stack((pre_train_pts,rots)),epochs=5)
+		self.ik.fit(pre_train_pts,rigid_ik,epochs=5)
+
 		for epoch in config.TRAINING_EPOCHS:
 			pts = self.get_points_on_circle(config.NUM_POINTS_PER_EP,max_rad,z_des)
 			ik_pts = self.predict_ik(pts)
 
-			########### TODO figure out difference in ee rot #############################
+			########### TODO figure out difference in ee rot ##########
 			act_poses,ee_poses,ee_rots = record_trajectory(da,op,ik_pts,pos_0=pos_0,rot_0=rot_0)
 
 			print("Trajectory Error:",np.mean(np.linalg.norm(ee_poses-pts)))
