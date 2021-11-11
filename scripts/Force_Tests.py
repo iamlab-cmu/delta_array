@@ -113,7 +113,7 @@ class Force_Testing():
     
     def get_pose_traj(self,xval):
         traj = np.linspace([xval,-1,2.2],[xval,1,2.2],11)
-        ik,valid_mask = self.model.predict_ik_traj(traj)
+        ik,valid_mask = self.model.predict_ik(traj)
 
         traj = traj[valid_mask]
         return traj
@@ -121,8 +121,8 @@ class Force_Testing():
     def debug_loop(self):
         last_inp = "f1"
         while True:
-            #inp = input("c a0,a1,a2: Command Position (a0,a1,a2)\ne e0,e1,e2: Command ee Position\nf i: Get Force Reading for Load Cell i\nr: Retract\n")
-            inp = input("\n")
+            inp = input("c a0,a1,a2: Command Position (a0,a1,a2)\ne e0,e1,e2: Command ee Position\nf i: Get Force Reading for Load Cell i\nr: Retract\n")
+            #inp = input("\n")
             try:
                 if inp == "":
                     inp = last_inp
@@ -272,8 +272,8 @@ class Force_Testing():
                 force = force)
 
 
-fk_save_file = "./models/training_data_rot_fk_full_aug"
-ik_save_file = "./models/training_data_rot_ik_full_aug"
+fk_save_file = "./models/training_data_flat_fk.h5"
+ik_save_file = "./models/training_data_flat_ik.h5"
 model = NN(ik_save_file,fk_save_file,
 			ik_save_file,fk_save_file,load=True)
 

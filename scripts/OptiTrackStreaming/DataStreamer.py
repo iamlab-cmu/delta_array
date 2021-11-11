@@ -55,13 +55,15 @@ class OptiTrackDataStreamer():
             l = l[1:]
     
     def get_closest_datapoint(self,time):
+        #convert to cm
+
         if len(self.times) == 0:
             return None,None,None
         ind = np.argmin(abs(np.subtract(self.times,time)))
         pos = self.poses[ind]
         rot = self.rots[ind]
         time = self.times[ind]
-        return np.array(pos),np.array(rot),time
+        return np.array(pos)*100,np.array(rot),time
         
 
     # This is a callback function that gets connected to the NatNet client. 

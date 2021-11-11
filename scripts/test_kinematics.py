@@ -1,19 +1,40 @@
+from numpy.core.defchararray import center
 from Prismatic_Delta import Prismatic_Delta
 from Model import NN
 import numpy as np
-from delta_utils import record_trajectory, initialize_array_recording, close_all
+from delta_utils import record_trajectory, initialize_array_recording, close_all, center_delta
 
 
-fk_save_file = "./models/training_data_rot_fk_full_aug_op_up.h5"
-ik_save_file = "./models/training_data_rot_ik_full_aug_op_up.h5"
+fk_save_file = "./models/training_data_aug_fk.h5"
+ik_save_file = "./models/training_data_aug_ik.h5"
 
-aug_model = NN(ik_save_file,fk_save_file,
+model_aug = model1 = NN(ik_save_file,fk_save_file,
 			ik_save_file,fk_save_file,load=True)
 
-fk_save_file = "./models/training_data_rot_fk_full_base_op_up.h5"
-ik_save_file = "./models/training_data_rot_ik_full_base_op_up.h5"
+fk_save_file = "./models/training_data_base_fk.h5"
+ik_save_file = "./models/training_data_base_ik.h5"
 
-base_model = NN(ik_save_file,fk_save_file,
+model_base = model1 = NN(ik_save_file,fk_save_file,
+			ik_save_file,fk_save_file,load=True)
+
+fk_save_file = "./models/training_data_flat_fk.h5"
+ik_save_file = "./models/training_data_flat_ik.h5"
+
+model1 = NN(ik_save_file,fk_save_file,
+			ik_save_file,fk_save_file,load=True)
+
+
+fk_save_file = "./models/training_data_flat_fk_2.h5"
+ik_save_file = "./models/training_data_flat_ik_2.h5"
+
+model2 = NN(ik_save_file,fk_save_file,
+			ik_save_file,fk_save_file,load=True)
+
+
+fk_save_file = "./models/training_data_flat_fk_3.h5"
+ik_save_file = "./models/training_data_flat_ik_3.h5"
+
+model3 = NN(ik_save_file,fk_save_file,
 			ik_save_file,fk_save_file,load=True)
 
 s_p = 1.538 #side length of the platform
@@ -22,7 +43,7 @@ l = 4.75 #length of leg attached to platform
 
 rigid_Delta = Prismatic_Delta(s_p, s_b, l)
 
-traj_height = 1.5
+traj_height = 2
 spiral_traj = [[0,0,traj_height]]
 num_rad_steps = 30
 step_size = .5  #cm in radial direction
@@ -45,27 +66,44 @@ for step in np.arange(1,4.6,step_size):
 spiral_traj = np.array(spiral_traj)
 
 rigid_ik = np.array(rigid_ik)
-base_ik,base_valid = base_model.predict_ik(spiral_traj,return_valid_mask=True)
-aug_ik,aug_valid = aug_model.predict_ik(spiral_traj,return_valid_mask=True)
+ik_1 = model1.ik(spiral_traj)
+ik_2 = model2.ik(spiral_traj)
+ik_3 = model3.ik(spiral_traj)
 
-valid_mask = base_valid & aug_valid
-
-rigid_ik = rigid_ik[valid_mask]
-base_ik = base_ik[valid_mask]
-aug_ik = aug_ik[valid_mask]
+ik_base = model_base.ik(spiral_traj)
+ik_aug = model_aug.ik(spiral_traj)
 
 da,op = initialize_array_recording()
 
-act_pos_rigid, ee_pos_rigid, ee_rot_rigid = record_trajectory(da,op,rigid_ik)
-act_pos_base, ee_pos_base, ee_rot_base = record_trajectory(da,op,base_ik)
-act_pos_aug, ee_pos_aug, ee_rot_aug = record_trajectory(da,op,aug_ik)
+pos_0,rot_0 = center_delta(da,op)
+
+act_pos_rigid, ee_pos_rigid, ee_rot_rigid = record_trajectory(da,op,rigid_ik,pos_0,rot_0)
+act_pos_1, ee_pos_1, ee_rot_1 = record_trajectory(da,op,ik_1,pos_0,rot_0)
+act_pos_2, ee_pos_2, ee_rot_2 = record_trajectory(da,op,ik_2,pos_0,rot_0)
+act_pos_3, ee_pos_3, ee_rot_3 = record_trajectory(da,op,ik_3,pos_0,rot_0)
+
+act_pos_aug,ee_pos_aug,ee_rot_aug = record_trajectory(da,op,ik_aug,pos_0,rot_0)
+act_pos_base,ee_pos_base,ee_rot_base = record_trajectory(da,op,ik_base,pos_0,rot_0)
 
 
-save_file = "Delta_2_Kinematic_Test_op_up"
+save_file = "./Kinematic_Tests/Delta_1_Kinematic_Test_Flat"
+
+# np.savez(save_file,
+#     act_pos_rigid = D["act_pos_rigid"],ee_pos_rigid=D["ee_pos_rigid"],ee_rot_rigid=D["ee_rot_rigid"],
+#     act_pos_1 = D["act_pos_1"],ee_pos_1=D["ee_pos_1"],ee_rot_1=D["ee_rot_1"],
+#     act_pos_2=D["act_pos_2"], ee_pos_2=D["ee_pos_2"], ee_rot_2=D["ee_rot_2"],
+#     act_pos_3=D["act_pos_3"], ee_pos_3=D["ee_pos_3"], ee_rot_3=D["ee_rot_3"],
+#     act_pos_aug=act_pos_aug,ee_pos_aug=ee_pos_aug,ee_rot_aug=ee_rot_aug,
+#     act_pos_base=act_pos_base,ee_pos_base=ee_pos_base,ee_rot_base=ee_rot_base,
+#     traj = spiral_traj)
+
 np.savez(save_file,
     act_pos_rigid = act_pos_rigid,ee_pos_rigid=ee_pos_rigid,ee_rot_rigid=ee_rot_rigid,
-    act_pos_base = act_pos_base,ee_pos_base=ee_pos_base,ee_rot_base=ee_rot_base,
-    act_pos_aug = act_pos_aug,ee_pos_aug=ee_pos_aug,ee_rot_aug=ee_rot_aug,
+    act_pos_1 = act_pos_1,ee_pos_1=ee_pos_1,ee_rot_1=ee_rot_1,
+    act_pos_2=act_pos_2, ee_pos_2=ee_pos_2, ee_rot_2=ee_rot_2,
+    act_pos_3=act_pos_3, ee_pos_3=ee_pos_3, ee_rot_3=ee_rot_3,
+    act_pos_aug=act_pos_aug,ee_pos_aug=ee_pos_aug,ee_rot_aug=ee_rot_aug,
+    act_pos_base=act_pos_base,ee_pos_base=ee_pos_base,ee_rot_base=ee_rot_base,
     traj = spiral_traj)
 
 

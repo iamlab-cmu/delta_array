@@ -103,7 +103,7 @@ class DeltaArray:
                 elif stringline[0] == 'd':
                     #print(stringline[0:])
                     #breakpoint()
-                    print('done')
+                    #print('done')
                     self.done_moving = True
                     return True
             except:

@@ -58,11 +58,12 @@ def record_trajectory(da,op,heights,pos_0=None,rot_0=None):
     ee_rot = []
 
     for i,height in enumerate(heights): 
-        print(100*i/len(heights),"\%")
+        #print(100*i/len(heights),"\%")
         goto_position(da,height)
+        time.sleep(.1) #settling time for optitrack
         pos,rot_quat,t = op.get_closest_datapoint(time.time())
-        rot = R.from_quat(rot_quat).as_matrix()
 
+        rot = R.from_quat(rot_quat).as_matrix()
         act_pos.append(height)
         ee_pos.append(rot_0 @ (pos-pos_0))
         ee_rot.append(R.from_matrix(start_rot.T @ rot).as_quat())
@@ -82,16 +83,14 @@ def center_delta(da,op):
     retract(da)
 
     m = config.MIN_ACTUATOR_HEIGHT
-    traj = np.zeros((6,12))
-    traj[:,3] = m
-    traj[:,4] = np.linspace(m,m+.03,6)
-    traj[:,5] = np.linspace(m,m+.03,6)
+    traj = np.zeros((6,3))
+    traj[:,0] = m
+    traj[:,1] = np.linspace(m,m+3,6)
+    traj[:,2] = np.linspace(m,m+3,6)
     
-    cmd_traj = adjust_act_command(traj)
     poses = []
-    for cmd in cmd_traj:
-        da.move_joint_position(cmd.reshape(1,12),[1.0])
-        da.wait_until_done_moving()
+    for pose in traj:
+        goto_position(da,pose)
         pos,rot,t = op.get_closest_datapoint(time.time())
         poses.append(pos)
 

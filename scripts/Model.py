@@ -7,6 +7,7 @@ from tensorflow.keras.models import load_model
 import numpy as np 
 import config
 import random
+import time
 
 from scipy.spatial.transform import Rotation as R
 
@@ -45,8 +46,8 @@ class NN():
 		print("FK position error (cm):",pos_err)
 		print("FK rotation error (deg):",rot_err)
 
-	def train_networks(self,act_pos,ee_pos,ee_rot):
-		self.train_fk(act_pos,ee_pos,ee_rot)
+	def train_networks(self,act_pos,ee_pos,ee_rot,augment_data=False):
+		self.train_fk(act_pos,ee_pos,ee_rot,augment_data=augment_data)
 		self.train_ik(act_pos)
 
 	def train_fk(self,act_pos,ee_pos,ee_rot,augment_data=False):
@@ -111,29 +112,9 @@ class NN():
 			and for the initial guesses (act_pos) + normal_dist(mean=[0,0,0],guess_std) 
 		So the network will return the ik solution that is closest to the initial guess
 		'''
-		guesses_per_sample = config.IK_GUESSES_PER_SAMPLE
-		std = config.IK_GUESS_STD
-		num_samples = len(act_pos)
+		out = self.fk(act_pos)[:,:3]
 
-		inp = np.zeros((guesses_per_sample*num_samples,6))
-		out = np.zeros((guesses_per_sample*num_samples,3))
-		start_ind = 0
-
-		# use fk to predict rather than using data directly
-		# because data has been 'improved' by data augmentation
-		ee_pos = self.predict_fk(act_pos)[0] 
-		for act,ee in zip(act_pos,ee_pos):
-			end_ind = start_ind + guesses_per_sample
-
-			noise = np.random.normal(0,std,(guesses_per_sample,3))
-			
-			inp[start_ind:end_ind,:3] = ee
-			inp[start_ind:end_ind,3:] = noise + act
-			out[start_ind:end_ind,:] = act
-
-			start_ind += guesses_per_sample
-
-		self.ik.fit(inp,out,verbose=1,epochs=20)
+		self.ik.fit(out,act_pos,verbose=1,epochs=20)
 
 	def predict_fk(self,act_pos):
 		pred = self.fk.predict(act_pos)
@@ -142,12 +123,8 @@ class NN():
 
 		return ee_pos,ee_rot
 
-	def predict_ik(self,ee_pos,ik_guess=None, valid_tol = .3, return_valid_mask=False):
-		if ik_guess is None:
-			ik_pred = self.predict_ik_without_guess(ee_pos)
-		else:
-			inp = np.column_stack((ee_pos,ik_guess))
-			ik_pred = self.ik.predict(inp)
+	def predict_ik(self,ee_pos,valid_tol = .3, return_valid_mask=False):
+		ik_pred = self.ik(ee_pos)
 
 		if not return_valid_mask:
 			return ik_pred
@@ -156,69 +133,6 @@ class NN():
 		valid_mask = np.linalg.norm(fk_pred-ee_pos,axis=1) < valid_tol
 		
 		return ik_pred,valid_mask
-
-	def predict_ik_without_guess(self,ee_pos):
-		'''
-		Args:
-			ee_pos: N x 3 array of end effector positions 
-
-		Correct guess is known along the line [0,0,z] (it is [z,z,z])
-
-		Start from closest point on [0,0,z] and step by ~.2 cm at a time until ee_pos
-			is reached using each solution for point i as the guess for point i+1
-		'''
-
-		easy_pos = np.zeros(ee_pos.shape)
-		easy_pos[:,2] = ee_pos[:,2]
-		easy_guess = (ee_pos[:,2]*np.ones(ee_pos.shape).T).T
-
-		max_dist = np.max(abs(ee_pos[:,:2]))
-		num_pts = int((max_dist/.2)) + 1
-		traj = np.linspace(easy_pos,ee_pos,num_pts)
-
-		curr_guess = easy_guess
-		for t in traj:
-			pred = self.predict_ik(t,curr_guess)
-			curr_guess = pred
-		
-		return curr_guess
-
-	def predict_ik_traj(self,traj,mask_tolerance=.3):
-		'''
-		Args:
-			traj: Nx3 trajectory of desired end effector positions for Delta
-			mask_tolerance : see returned Valid_Mask
-
-			Both args are in cm
-
-		Returns 
-			IK: Nx3 inverse kinematic result for each point in trajectory
-			Valid_Mask: N x 1 mask, False where FK(IK) != traj (outside mask_tolerance)
-
-		The IK for each point in the trajectory is used as the guess for the next point
-			unless traj[i] is more than .3 cm from traj[i+1] or valid_mask[i] == False
-		'''
-
-		IK = []
-		Valid_Mask = []
-
-		curr_guess = None
-		last_pt = None
-		for pt in traj:
-			if last_pt is not None and np.linalg.norm(pt-last_pt) > .3:
-				curr_guess = None
-			curr_guess = self.predict_ik(np.expand_dims(pt,0),ik_guess=curr_guess)
-			IK.append(curr_guess)
-			f,_ = self.predict_fk(curr_guess)
-			if np.linalg.norm(f-pt) > mask_tolerance:
-				Valid_Mask.append(False)
-				curr_guess = None
-			else:
-				Valid_Mask.append(True)
-			last_pt = pt
-		
-
-		return np.array(IK).squeeze(),np.array(Valid_Mask)
 
 
 	def create_fk_model(self,input_dim = 3, output_dim = 7):
@@ -240,10 +154,7 @@ class NN():
 
 	def create_ik_model(self,input_dim = 3, output_dim = 3):
 		"""
-		Maps [ee_pos,ik_guess] to actuator position
-
-		The IK function is not 1 to 1, so an initial guess for the solution
-		is necessary to distinguish between ik solutions
+		Maps [ee_pos] to actuator position
 
 		IK does not learn an inverse for rotation because rotation is coupled with position, so the 
 		caller would have no way of specifying a correct position/rotation pair.
@@ -302,21 +213,31 @@ class NN():
 		pts = np.column_stack((rads*c,rads*s,np.ones(num_pts)*z_des))
 		return pts
 	
+	def get_spiral(self,num_rotations,pts_per_rot,max_rad,z_des):
+		num_pts = pts_per_rot*num_rotations
+		start_angle = np.random.uniform(0,2*np.pi)
+		radii = np.linspace(0,max_rad,num=num_pts)
+		rads = np.linspace(start_angle,start_angle+2*np.pi*num_rotations,num=num_pts)
+
+		pts = np.vstack((np.cos(rads)*radii,np.sin(rads)*radii,z_des*np.ones(len(rads)))).T
+		return pts
+
+	
 	def sample_mem_buf(self,mem_buf):
-		num_samples = min(len(mem_buf,config.BATCH_SIZE))
-		d = np.random.choice(mem_buf,num_samples,replace=False)
+		num_samples = min(len(mem_buf),config.BATCH_SIZE)
+		inds = np.random.choice(np.arange(len(mem_buf)),num_samples,replace=False)
+		d = np.array(mem_buf)[inds]
 		act_pos,ee_pos,ee_rot,goal_pos = list(zip(*d))
-		return act_pos,ee_pos,ee_rot,goal_pos
+		return np.array(act_pos),np.array(ee_pos),np.array(ee_rot),np.array(goal_pos)
 
 	def train_on_batch(self,mem_buf):
 		act_pos,ee_pos,ee_rot,goal_pos = self.sample_mem_buf(mem_buf)
 		ee = np.column_stack((ee_pos,ee_rot))
-		self.fk.fit(act_pos,ee,epochs=1,verbose=1)
 
+		self.fk.fit(act_pos,ee,epochs=1,verbose=0)
 		with tf.GradientTape(watch_accessed_variables=False) as g:
 			g.watch(self.ik.trainable_weights)
-			ik_in = np.column_stack(goal_pos) 
-			ik_out = self.ik(ik_in)
+			ik_out = self.ik(goal_pos)
 			fk_out = self.fk(ik_out)[:,:3]
 			
 			ik_loss = tf.reduce_mean(tf.keras.losses.MSE(fk_out,goal_pos))
@@ -325,31 +246,71 @@ class NN():
 		self.ik_Adam.apply_gradients(zip(ik_grads,self.ik.trainable_weights))
 
 
-	def learn_online(self,da,op,max_rad,z_des,rigid_delta):
-		from delta_utils import record_trajectory, center_delta
+	def learn_online(self,max_rad,z_des,rigid_delta,learn_rigid=False):
+		from delta_utils import record_trajectory, center_delta, initialize_array_recording, close_all
+		da,op = initialize_array_recording()
 		
 		pos_0, rot_0 = center_delta(da,op)
 		mem_buf = []
 
-		pre_train_pts = self.get_points_on_circle(200,max_rad,z_des)
-		rigid_ik = rigid_delta.IK_traj(pre_train_pts)
-		rots = np.column_stack((np.zeros((200,3)),np.ones((200,1))))
-		print("Pretraining with Rigid Kinematics")
-		self.fk.fit(rigid_ik,np.column_stack((pre_train_pts,rots)),epochs=5)
-		self.ik.fit(pre_train_pts,rigid_ik,epochs=5)
+		if learn_rigid:
+			rigid_ik_offset = rigid_delta.FK([0,0,0])[0,2]
+			pre_train_pts = self.get_points_on_circle(200,max_rad,z_des+rigid_ik_offset)
+			
+			rigid_ik = rigid_delta.IK_Traj(pre_train_pts)
+			pre_train_pts[:,-1] -= rigid_ik_offset
 
-		for epoch in config.TRAINING_EPOCHS:
+			rots = np.column_stack((np.zeros((200,3)),np.ones((200,1))))
+			print("Pretraining with Rigid Kinematics")
+			self.fk.fit(rigid_ik,np.column_stack((pre_train_pts,rots)),epochs=10)
+			self.ik.fit(pre_train_pts,rigid_ik,epochs=10)
+		
+		start_time = time.time()
+
+		for epoch in range(config.TRAINING_EPOCHS):
+			print("Epoch:",epoch)
+
+			if epoch % 25 == 0:
+				#evaluate to check if done early
+				traj = self.get_spiral(3,30,max_rad,z_des)
+				ik_pts = self.ik(traj)
+
+				act_poses,ee_poses,ee_rots = record_trajectory(da,op,ik_pts,pos_0=pos_0,rot_0=rot_0)
+
+				eval_error = np.mean(np.linalg.norm(ee_poses-traj,axis=1))
+				print("Evaluation Error:",eval_error)
+
+				mem_buf.extend(list(zip(act_poses,ee_poses,ee_rots,traj)))
+
+				if eval_error < .2:
+					return
+
 			pts = self.get_points_on_circle(config.NUM_POINTS_PER_EP,max_rad,z_des)
-			ik_pts = self.predict_ik(pts)
+			traj = []
+			for i in range(len(pts)-1):
+				dist = np.linalg.norm(pts[i]-pts[i+1])
+				traj.extend(np.linspace(pts[i],pts[i+1],num=int(dist/.75)+1,endpoint=False))
+			traj.append(pts[-1])
+			traj = np.array(traj)
 
-			########### TODO figure out difference in ee rot ##########
+			ik_pts = self.ik(traj)
+
 			act_poses,ee_poses,ee_rots = record_trajectory(da,op,ik_pts,pos_0=pos_0,rot_0=rot_0)
 
-			print("Trajectory Error:",np.mean(np.linalg.norm(ee_poses-pts)))
+			print("Trajectory Error:",np.mean(np.linalg.norm(ee_poses-traj,axis=1)))
 
-			mem_buf.extend(list(zip(act_poses,ee_poses,ee_rots,pts)))
+			mem_buf.extend(list(zip(act_poses,ee_poses,ee_rots,traj)))
 
-			self.train_on_batch(mem_buf)
+			for i in range(min(epoch+5,config.TRAIN_PER_EP)):
+				self.train_on_batch(mem_buf)
+			self.save_all()
+		
+		end_time = time.time()
+		print("Training took:",end_time-start_time)
+		close_all(da,op)
+
+			
+
 
 
 

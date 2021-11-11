@@ -11,21 +11,16 @@ ACTUATOR_ARDUINO_PORT = "/dev/cu.usbmodem14201"
 
 BATCH_SIZE = 64
 MEM_SIZE = 500000
-TRAIN_PER_EP = 50
-TRAINING_EPOCHS = 200
-NUM_POINTS_PER_EP = 10
-
-#Add random noise around initial guesses when training IK
-IK_GUESS_STD = .2
-IK_GUESSES_PER_SAMPLE = 10
+TRAIN_PER_EP = 32
+TRAINING_EPOCHS = 300
+NUM_POINTS_PER_EP = 5
 
 
 ############## Load Cell Params ###########
-LOAD_CELL_PARAMS = {"m0":1.5043,"b0":-.2813,
-	"m1":11.4562,"b1":.09495,
-	"m2":11.691,"b2":.08828,
-	"m3":11.99086,"b3":.09078,
-	"m4":11.798,"b4":.10548}
+LOAD_CELL_PARAMS = {"m0":20.3,"b0":.0096,
+	"m1":20.3,"b1":.0096,
+	"m2":20.3,"b2":.0096,
+	"m3":20.3,"b3":.0096}
 
 # Map Load cell number to the direction of force the Delta is applying
 # towards that load cell (from the Delta's frame of reference)
