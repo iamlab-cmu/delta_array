@@ -29,7 +29,7 @@ model.save_all()
 
 # rigid_Delta = Prismatic_Delta(s_p, s_b, l)
 # max_rad = 4.5 
-# z_des = 2
+# z_des = config.LEARN_Z
 
 # model.learn_online(max_rad,z_des,rigid_Delta,learn_rigid=False)
 # model.save_all()

@@ -124,15 +124,21 @@ class NN():
 		return ee_pos,ee_rot
 
 	def predict_ik(self,ee_pos,valid_tol = .3, return_valid_mask=False):
-		ik_pred = self.ik(ee_pos)
+		z_learned = config.LEARN_Z
+		z_des = ee_pos[:,-1]
+		diff = np.expand_dims(z_des-z_learned,1)
+
+		#predict IK at the learned z value by projecting onto cirlce
+		ee_proj = np.column_stack((ee_pos[:,:2],z_learned*np.ones((ee_pos.shape[0],1))))
+		ik_pred = self.ik(ee_proj)
 
 		if not return_valid_mask:
-			return ik_pred
+			return ik_pred + np.ones(ee_pos.shape)*diff
 
 		fk_pred = self.predict_fk(ik_pred)[0]
-		valid_mask = np.linalg.norm(fk_pred-ee_pos,axis=1) < valid_tol
+		valid_mask = np.linalg.norm(fk_pred-ee_proj,axis=1) < valid_tol
 		
-		return ik_pred,valid_mask
+		return ik_pred + np.ones(ee_pos.shape)*diff,valid_mask
 
 
 	def create_fk_model(self,input_dim = 3, output_dim = 7):

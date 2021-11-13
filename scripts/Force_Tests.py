@@ -7,10 +7,6 @@ import numpy as np
 from DeltaArray import DeltaArray
 from Model import NN
 
-def retract(da):
-    da.reset()
-    da.wait_until_done_moving()
-
 def adjust_act_command(command):
     #Nx12 trajectory to adjust in cm
     #Actuators 3:6 are calibrated with linear regression
@@ -53,12 +49,13 @@ class Load_Cell():
 
     def calibrate(self):
         vec = []
-        for i in range(1,6):
-            input("Place " + str(i) +" kg on weight")
+        weights = np.array([0,.1,.2,.3,.5])
+        for weight in weights:
+            input("Place " + str(weight) +" kg on weight")
             vec.append(self.readSensorRaw())
 
-        y = np.arange(1,6).reshape((5,1))
-        x = np.array(vec).reshape((5,1))
+        y = weights.reshape((len(weights),1))
+        x = np.array(vec).reshape((len(weights),1))
 
         reg = LinearRegression().fit(x,y)
 
@@ -70,6 +67,22 @@ class Load_Cell():
         print("b = ",b)
 
         print("error =",y-m*x - b)
+        print("Mean Error:",np.mean(y-m*x - b))
+        print("Max Error:",np.max(y-m*x - b))
+    
+    def test_calibration(self,cell_no):
+        vec = []
+        weights = np.array([0,.1,.2,.3,.5])
+        for weight in weights:
+            input("Place " + str(weight) +" kg on weight")
+            vec.append(self.readSensor(cell_no))
+
+        y = weights.reshape((len(weights),1))
+        x = np.array(vec).reshape((len(weights),1))
+
+        print("error =",y-x)
+        print("Mean Error:",np.mean(y-x))
+        print("Max Error:",np.max(y-x))
 
 
 
@@ -88,7 +101,7 @@ class Force_Testing():
             self.start_act_position = []
             self.command_act_position = []
 
-            self.force = []
+            self.forces = []
         else:
             Data = np.load(filename)
             self.start_ee_position = list(Data["start_ee_position"])
@@ -97,7 +110,7 @@ class Force_Testing():
             self.start_act_position = list(Data["start_act_position"])
             self.command_act_position = list(Data["command_act_position"])
 
-            self.force = list(Data["force"])
+            self.forces = list(Data["forces"])
 
 
         self.load_cells = {}
@@ -106,22 +119,28 @@ class Force_Testing():
             
     def goto_position(self,pos,timeout=3):
         act_cmd = np.zeros((1,12))
+
         act_cmd[0,3:6] = pos
         act_cmd = adjust_act_command(act_cmd)
         self.da.move_joint_position(act_cmd, [1.])
         return self.da.wait_until_done_moving(timeout=timeout)
     
     def get_pose_traj(self,xval):
-        traj = np.linspace([xval,-1,2.2],[xval,1,2.2],11)
-        ik,valid_mask = self.model.predict_ik(traj)
+        z = config.TEST_HEIGHT
+        traj = np.linspace([xval,-4,z],[xval,4,z],9)
+        #traj = np.array([[0,0,z]])
+        ik,valid_mask = self.model.predict_ik(traj,return_valid_mask=True)
 
         traj = traj[valid_mask]
         return traj
 
+    def retract(self):
+        self.goto_position(config.RETRACT_POS)
+
     def debug_loop(self):
         last_inp = "f1"
         while True:
-            inp = input("c a0,a1,a2: Command Position (a0,a1,a2)\ne e0,e1,e2: Command ee Position\nf i: Get Force Reading for Load Cell i\nr: Retract\n")
+            inp = input("c a0,a1,a2: Command Position (a0,a1,a2)\ne e0,e1,e2: Command ee Position\nf i: Get Force Reading for Load Cell i\nr: Retract\n"+"bp: Breakpoint\n")
             #inp = input("\n")
             try:
                 if inp == "":
@@ -138,7 +157,7 @@ class Force_Testing():
                     self.goto_position(act_in,timeout=1.5)
 
                 elif inp[0] == "r":
-                    retract(self.da)
+                    self.goto_position([.75,.75,.75])
 
                 elif inp[0] == "f":
                     cell_ind = int(inp[1:])
@@ -147,7 +166,8 @@ class Force_Testing():
                     else: 
                         print("Not a valid load cell index")
                     last_inp = inp
-
+                elif inp == "bp":
+                    breakpoint()
                 else:
                     print("Not a valid command")
             except:
@@ -156,9 +176,9 @@ class Force_Testing():
             
                 
 
-    def test_loop(self):
-        retract(self.da)
-        traj = self.get_pose_traj(2)
+    def test_loop(self,xval):
+        self.retract()
+        traj = self.get_pose_traj(xval)
 
         ind = 0
         while ind < len(traj):
@@ -170,106 +190,92 @@ class Force_Testing():
 
             force = []
 
-            pt = traj[ind] 
+            center_pt = np.expand_dims(traj[ind],0)
+            print("Center Point:",center_pt)
 
-            pred_pt = self.model.predict_ik(np.expand_dims(pt,0))
-            act_cmd = np.zeros((1,12))
-            act_cmd[0,3:6] = pred_pt
-            act_cmd = adjust_act_command(act_cmd)
-            self.da.move_joint_position(act_cmd, [1.])
-            self.da.wait_until_done_moving()
+            center_pt_ik = self.model.predict_ik(center_pt)
+            d = config.TEST_HEIGHT-config.REST_HEIGHT
+            self.goto_position(center_pt_ik-[d,d,d])
 
-            input("Moving Delta Under Load Cells")
+            input("Move Load Cells Over Delta")
+            self.goto_position(center_pt_ik)
 
-            for i in range(1,4):
+            i = 0
+            while i < 1:
                 lc = self.load_cell
                 lcd = self.load_cell_dirs[i]
 
-                pt0 = np.expand_dims(pt,0) + lcd*.5
-                pred0 = self.model.predict_ik(pt0)
+                pt0 = center_pt + lcd*config.DIST2CELL
+                pt0_ik = self.model.predict_ik(pt0)
 
-                #command calibrated actuator to position
-                act_cmd = np.zeros((1,12))
-                act_cmd[0,3:6] = pred0 
-                act_cmd = adjust_act_command(act_cmd)
-                self.da.move_joint_position(act_cmd, [1.])
-                self.da.wait_until_done_moving()
-                inp = input("Press Enter When Ready Or S To Skip")
-                if inp == "s":
-                    continue
-                
-                inc = 1
-                last_read = lc.readSensor(i)
-                first_read = last_read
-                pred = pred0
+                self.goto_position(pt0_ik)
 
+                inc = 0
                 while True:
-                    # move Delta in direction lcd until force stops increasing
-                    dir = lcd*inc
-                    pred = self.model.predict_ik(np.expand_dims(pt+dir,0),pred)
+                    inc += config.TEST_INC
+                    test_pt = pt0 + lcd*inc
+                    test_pt_ik = self.model.predict_ik(test_pt)
+                    self.goto_position(test_pt_ik,timeout=1)
 
-                    #command calibrated actuator to position
-                    act_cmd = np.zeros((1,12))
-                    act_cmd[0,3:6] = pred 
-                    act_cmd = adjust_act_command(act_cmd)
-                    self.da.move_joint_position(act_cmd, [1.])
-                    succ = self.da.wait_until_done_moving(timeout=1)
-                    # if not succ and not contact:
-                    #     print("Contact Made")
-                    #     pred_0_contact = pred
-                    #     pt_contact = pt+dir
-                    #     contact = True
-
+                    stop = False
+                    redo = False
+                    while True:
+                        inp = input("k:keep going, l:stop,r:redo")
+                        if inp == "k":
+                            break
+                        elif inp == "l":
+                            stop = True
+                            break
+                        elif inp == "r":
+                            redo = True
+                            break
+                    if redo:
+                        break    
+                    
+                    if stop:
+                        i += 1
+                        break
 
                     time.sleep(config.LOAD_CELL_LAG)
                     force_read = lc.readSensor(i)
-                    print("Force Read",force_read)
+                    print("Force Read:",force_read)
 
+                    start_act_position.append(pt0_ik)
+                    command_act_position.append(test_pt_ik)
+
+                    start_ee_position.append(pt0)
+                    command_ee_position.append(test_pt)
                     
-                    start_act_position.append(pred0)
-                    command_act_position.append(pred)
-
-                    start_ee_position.append(pt)
-                    command_ee_position.append(pt + dir)
-                    
-                    force.append((force_read-first_read)*lcd)
-
-                    last_read = force_read
-                    if inc >= 3:
-                        break
-                    inc += .5
+                    force.append(force_read*lcd)
+                
+                succ = self.goto_position(pt0_ik,timeout=5)
+                if not succ:
+                    print("Failed to Return")
+                time.sleep(3)
             
-            act_cmd = np.zeros((1,12))
-            act_cmd[0,3:6] = pred_pt - np.min(pred_pt)
-            act_cmd = adjust_act_command(act_cmd)
-            self.da.move_joint_position(act_cmd, [1.])
-            self.da.wait_until_done_moving()
+            self.goto_position(self.goto_position(center_pt_ik-[d,d,d]))
 
             while True:
-                ans = input("Are you satisfied with the data at this point? y/n/r/bp\n")
+                ans = input("Are you satisfied with the data at this point? y/n/c/bp\n")
                 if ans.lower() == "y":
                     self.start_act_position.extend(start_act_position)
                     self.start_ee_position.extend(start_ee_position)
                     self.command_act_position.extend(command_act_position)
                     self.command_ee_position.extend(command_ee_position)
-                    self.force.extend(force)
+                    self.forces.extend(force)
                     ind += 1
                     break 
                 elif ans.lower() == "n":
-                    ind += 1
+                    print("Taking Datapoint Again")
                     break
                 elif ans.lower() == "bp":
                     breakpoint()
-                elif ans.lower() == "r":
-                    print("Taking Datapoint Again")
-                    break
-            
-
+                    
             np.savez(self.filename,start_act_position=self.start_act_position,
                 start_ee_position=self.start_ee_position,
                 command_act_position=self.command_act_position,
                 command_ee_position=self.command_ee_position,
-                force = force)
+                forces = self.forces)
 
 
 fk_save_file = "./models/training_data_flat_fk.h5"
@@ -279,9 +285,10 @@ model = NN(ik_save_file,fk_save_file,
 
 da = DeltaArray(config.ACTUATOR_ARDUINO_PORT)
 
-f = Force_Testing(model,da,filename="force_test_data_pp.npz", overwrite=True)
+f = Force_Testing(model,da,filename="force_test_1_data_tpu_z.npz", overwrite=False)
 f.debug_loop()
-#f.test_loop()
+#f.test_loop(4)
+
 
 
 
