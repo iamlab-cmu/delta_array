@@ -251,7 +251,7 @@ class Force_Testing():
                 succ = self.goto_position(pt0_ik,timeout=5)
                 if not succ:
                     print("Failed to Return")
-                time.sleep(3)
+                time.sleep(5)
             
             self.goto_position(self.goto_position(center_pt_ik-[d,d,d]))
 

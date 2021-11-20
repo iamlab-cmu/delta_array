@@ -12,7 +12,7 @@ ACTUATOR_ARDUINO_PORT = "/dev/cu.usbmodem14201"
 BATCH_SIZE = 64
 MEM_SIZE = 500000
 TRAIN_PER_EP = 32
-TRAINING_EPOCHS = 300
+TRAINING_EPOCHS = 100
 NUM_POINTS_PER_EP = 5
 LEARN_Z = 2 #value of z at which to learn Kinematics
 

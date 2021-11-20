@@ -4,14 +4,23 @@ import random
 def load_training_data(filename, discard_flipped_ax = True):
 	data =  np.load(filename)
 	#data[:,1,:] -= [ 0.12610888, -0.15389195,  0.26082584]
-	act_pos = data["act_pos"]
+	act_pos = 100*data["act_pos"]
 	ee_rot = data["ee_rot"]
-	ee_pos = data["ee_pos"]
+	ee_pos = 100*data["ee_pos"]
 
 	if discard_flipped_ax:
 		act_pos,ee_pos,ee_rot = discard_flipped_axes(act_pos,ee_pos,ee_rot)
+	
+	act_pos,ee_pos,ee_rot = discard_high_knees(act_pos,ee_pos,ee_rot)
 
-	return act_pos,100*ee_pos,ee_rot
+	return act_pos,ee_pos,ee_rot
+
+def discard_high_knees(act_pos,ee_pos,ee_rot):
+	rigid_offset = 4.76 + .5
+
+	valid_mask = np.all(act_pos < ((ee_pos[:,2]+rigid_offset)*np.ones(ee_pos.shape).T).T,1)
+	return act_pos[valid_mask],ee_pos[valid_mask],ee_rot[valid_mask]
+
 
 def get_n_to_1(act_pos,ee_pos,ee_rot,num_samples = None):
 	'''
@@ -43,16 +52,17 @@ def get_n_to_1(act_pos,ee_pos,ee_rot,num_samples = None):
 		close_pos_mask = np.linalg.norm(ee_pos - ee_pos[i],axis=1) < .1
 
 		#less than 5 degrees difference in the rotation matrices
-		close_rot_mask = np.arccos(np.clip((np.trace(ee_rot @ ee_rot[i].T,axis1=1,axis2=2)-1)/2,-1,1))*360/2/np.pi < 5
+		#close_rot_mask = np.arccos(np.clip((np.trace(ee_rot @ ee_rot[i].T,axis1=1,axis2=2)-1)/2,-1,1))*360/2/np.pi < 5
+		close_rot_mask = np.ones(ee_pos.shape[0],dtype=np.bool)
 
-		far_act_pos_mask = np.linalg.norm(act_pos-act_pos[i],axis=1) > .01
+		far_act_pos_mask = (np.linalg.norm(act_pos-act_pos[i],axis=1) > .5) | np.all((act_pos==act_pos[i]),1)
 
 		close_mask = close_pos_mask & close_rot_mask & far_act_pos_mask
 
 		if np.sum(close_mask) > 1:
-			aliasing_act_poses.append(act_pos[close_mask])
-			aliasing_masks.append(close_mask)
-			skip_inds.extend(np.argwhere(close_mask).squeeze())
+			aliasing_act_poses.append(act_pos[close_pos_mask])
+			aliasing_masks.append(close_pos_mask)
+			skip_inds.extend(np.argwhere(close_pos_mask).squeeze())
 			if len(aliasing_masks) == num_samples:
 				break
 
@@ -81,17 +91,22 @@ def discard_flipped_axes(act_pos,ee_pos,ee_rot):
 
 
 if __name__ == "__main__":
-	files = ["training_data_rot.npz","training_data_rot_sparse.npz","training_data_rot_sparse^2.npz"]
+	files = ["./training_data/training_data_rot.npz"]
 
 	a,b,c = load_training_data(files[0])
-	a,b,c = discard_flipped_axes(a,b,c)
 
-	a1,b1,c1 = load_training_data(files[1])
-	a1,b1,c1 = discard_flipped_axes(a1,b1,c1)
+	poses,masks = get_n_to_1(a,b,c)
 
-	a2,b2,c2 = load_training_data(files[2])
-
-	poses,masks = get_n_to_1(a,b,c,num_samples=10)
+	count = 0
+	dists = []
+	for p,m in zip(poses,masks):
+		max_dist = 0
+		for act in p:
+			dist = np.min((np.max(abs(p-act),1)[np.any(abs(p-act) > 0,1)]))
+			if dist > max_dist:
+				max_dist = dist
+		dists.append(max_dist)
+				
 	breakpoint()
 
 
