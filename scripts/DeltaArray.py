@@ -86,11 +86,11 @@ class DeltaArray:
 
     def update_joint_positions_and_velocities(self):
 
-       #line = self.ser.readline() # read and throw away first incomplete line
+        line = self.ser.readline() # read and throw away first incomplete line
         
         while True:
             line = self.ser.readline() #CHANGE: test complete lines
-            #print(line)
+            # print(line)
             try:
                 stringline = bytes.decode(line)
                 #print(stringline)
@@ -107,6 +107,7 @@ class DeltaArray:
                     self.done_moving = True
                     return True
             except:
+                print("IDR JHOL HORAY?")
                 pass # Readline did not return a valid string.
 
 

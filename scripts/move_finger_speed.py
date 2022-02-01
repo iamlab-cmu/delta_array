@@ -2,8 +2,8 @@ from DeltaArray import DeltaArray
 import numpy as np
 from time import sleep
 
-# da = DeltaArray('/dev/ttyACM0') -- CHANGE PORT
-da = DeltaArray('COM17')
+da = DeltaArray('/dev/ttyACM0') #-- CHANGE PORT
+# da = DeltaArray('COM17')
 
 # PRESET POSITIONS
 p = np.ones((8, 12)) * 0.0012

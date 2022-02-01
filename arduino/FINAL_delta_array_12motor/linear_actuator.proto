@@ -1,0 +1,13 @@
+syntax = "proto3";
+import "nanopb.proto";
+
+message lin_actuator{
+    int32 id = 1;
+    repeated float joint_pos = 2 [(nanopb).max_count = 12];
+
+    /*
+    Uncomment foll line and comment other stuff to compile 
+    python version of pb2.py
+    */
+    // repeated float joint_pos = 2;
+}

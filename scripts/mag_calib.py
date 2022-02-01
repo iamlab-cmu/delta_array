@@ -3,8 +3,8 @@ import numpy as np
 from time import sleep
 from numpy import random
 
-# da = DeltaArray('/dev/ttyACM0') -- CHANGE PORT
-da = DeltaArray('COM9')
+da = DeltaArray('/dev/ttyACM0') #-- CHANGE PORT
+# da = DeltaArray('COM9')
 
 # PRESET POSITIONS
 posns = np.ones((1, 12)) * 0.0012

@@ -2,8 +2,8 @@ from DeltaArray import DeltaArray
 import numpy as np
 from time import sleep
 
-# da = DeltaArray('/dev/ttyACM0') -- CHANGE PORT
-da = DeltaArray('COM7')
+da = DeltaArray('/dev/ttyACM0') #-- CHANGE PORT
+# da = DeltaArray('COM7')
 
 # PRESET POSITIONS
 p = np.ones((8, 12)) * 0.0012
@@ -31,16 +31,16 @@ def retract():
 
 retract()
 # print_posn()
-for i in range(0, 8): # LOOP THROUGH ALL PRESET POSITIONS
-    duration = [1.0]
-    print(i)
-    da.move_joint_position(p[i, :].reshape(1,12), duration)
-    da.wait_until_done_moving()
-    sleep(2)
-    print_posn()
+# for i in range(0, 8): # LOOP THROUGH ALL PRESET POSITIONS
+#     duration = [1.0]
+#     print(i)
+#     da.move_joint_position(p[i, :].reshape(1,12), duration)
+#     da.wait_until_done_moving()
+#     sleep(2)
+#     print_posn()
     
 
-# RESET TO FULLY RETRACTED ACTUATORS
-retract()
+# # RESET TO FULLY RETRACTED ACTUATORS
+# retract()
 
 da.close()

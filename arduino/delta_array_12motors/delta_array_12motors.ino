@@ -8,6 +8,9 @@
 Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x62); 
 Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x60); 
 Adafruit_MotorShield MC2 = Adafruit_MotorShield(0x61); 
+//Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x61); 
+//Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x60); 
+//Adafruit_MotorShield MC2 = Adafruit_MotorShield(0x62); 
 
 // Create 12 motor objects (4 motors on 3 shields)
 Adafruit_DCMotor *MC0_M1 = MC0.getMotor(1);
@@ -93,7 +96,6 @@ char endMarker = '>';
 
 void recvWithStartEndMarkers() {
   char rc;
- 
   while (Serial.available() > 0 && newData == false) {
     rc = Serial.read();
 
@@ -213,7 +215,7 @@ void setup()
   // start all the ADCs
   ADC0.begin(0x49);
   ADC1.begin(0x48);
-  ADC2.begin(0x4B);
+  ADC2.begin(0x4A);
 
   ADC0.setGain(GAIN_ONE);
   ADC1.setGain(GAIN_ONE);
@@ -261,7 +263,7 @@ int sampleTime = 0;
 void loop()
 {
   recvWithStartEndMarkers();
-
+//  Serial.println(joint_states);
   if (newData) {
 
     Serial.println(inputString);
@@ -364,6 +366,7 @@ void moveDeltaPosition()
       {
         float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
         int motor_speed = (int)(min(max(0.0, pid), 1.0) * 255.0);
+//        Serial.print(motor_speed);
         motors[i]->setSpeed(motor_speed);
         motors[i]->run(BACKWARD);
         joint_velocities[i] = -max_motor_speed[i];
