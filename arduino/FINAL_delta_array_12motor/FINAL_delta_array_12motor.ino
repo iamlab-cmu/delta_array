@@ -70,12 +70,18 @@ static byte ndx = 0;
 char startMarker = '<';
 char endMarker = '>';
 
+unsigned long current_arduino_time;
+unsigned long last_arduino_time;
+float time_elapsed;
 
 float joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float new_joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 float position_threshold = 0.0008;
 float joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+// We need last_joint_errors to compute PID control value for d. 
+float last_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 // We need total_joint_errors to compute PID control value for i. 
 float total_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -136,13 +142,16 @@ void readJointPositions(){
 
 void writeJointPositions(){
   bool reached_point = false;
+  last_arduino_time = millis();
   while (!reached_point){
+    current_arduino_time = millis();
+    time_elapsed = float(current_arduino_time - last_arduino_time) / 1000.0;
     readJointPositions();
     reached_point = true;
     for(int i = 0; i < NUM_MOTORS; i++){
       joint_errors[i] = joint_positions[i] - new_joint_positions[i];
       
-      float pid = p * joint_errors[i] + i_pid * total_joint_errors[i];
+      float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
       
       if(joint_errors[i] > position_threshold){
         int motor_speed = (int)(min(max(0.0, pid), 1.0) * 255.0);
@@ -165,6 +174,7 @@ void writeJointPositions(){
         total_joint_errors[i] = 0.0;
       }
     }
+    last_arduino_time = current_arduino_time;
   }
   Serial.println("~ Moved to New Position");
 }

@@ -4,13 +4,13 @@ import numpy as np
 from serial import Serial
 from math import *
 import time
-arduino = Serial('/dev/ttyACM0', 57600)  
+arduino = Serial('/dev/ttyACM1', 57600)  
 
 
 delta_message = linear_actuator_pb2.lin_actuator()
 delta_message.id = 1
 
-NUM_MOTORS = 6
+NUM_MOTORS = 12
 
 def create_joint_positions(val):
     for i in range(12):
