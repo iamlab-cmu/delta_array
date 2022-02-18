@@ -55,11 +55,11 @@ int channels[NUM_MOTORS] = {0,1,0,//1st robot
 //int channels[NUM_MOTORS] = {3};
 
 //##################################### GLOBAL VARIABLES ###################################3
-const byte numChars = 128;
+const int numChars = 128;
 float pi = 3.1415926535;
-float p = 390.0;
-float i_pid = 0.25;
-float d = 0.25;
+float p = 300.0;
+float i_pid = 0.1;
+float d = 3.75;
 
 uint8_t input_cmd[numChars];
 bool newData = false;
@@ -67,8 +67,8 @@ bool newData = false;
 lin_actuator command = lin_actuator_init_zero;
 static boolean recvInProgress = false;
 static byte ndx = 0;
-char startMarker = '<';
-char endMarker = '>';
+char startMarker = 0xA6;
+char endMarker = 0xA7;
 
 unsigned long current_arduino_time;
 unsigned long last_arduino_time;
@@ -124,8 +124,9 @@ void loop() {
   // put your main code here, to run repeatedly:
   recvWithStartEndMarkers();
   if (newData == true) {
-    showNanopbData();
-    writeJointPositions();
+    if (showNanopbData()){
+      writeJointPositions();
+    }
     newData = false;
     ndx = 0;
   }
@@ -143,6 +144,7 @@ void readJointPositions(){
 void writeJointPositions(){
   bool reached_point = false;
   last_arduino_time = millis();
+//  Serial.pri/nt("?? id: X");Serial.print("; Joint /Pos: ");
   while (!reached_point){
     current_arduino_time = millis();
     time_elapsed = float(current_arduino_time - last_arduino_time) / 1000.0;
@@ -168,6 +170,7 @@ void writeJointPositions(){
         total_joint_errors[i] += joint_errors[i];
       }
       else{
+//        Serial.prin/t(joint_positions[i]);
         reached_point = reached_point && true;;
         motors[i]->setSpeed(0);
         motors[i]->run(RELEASE);
@@ -176,6 +179,13 @@ void writeJointPositions(){
     }
     last_arduino_time = current_arduino_time;
   }
+//  Serial.pr/intln();
+  for(int i = 0; i < 12; i++)
+    {
+      motors[i]->setSpeed(0);
+      motors[i]->run(RELEASE);
+      total_joint_errors[i] = 0.0;
+    }
   Serial.println("~ Moved to New Position");
 }
 
@@ -223,7 +233,7 @@ void recvWithStartEndMarkers() {
   }
 }
 
-void showNanopbData(){  
+bool showNanopbData(){  
   lin_actuator jointPositions = lin_actuator_init_zero;
   pb_istream_t istream = pb_istream_from_buffer(input_cmd, ndx);
   bool ret = pb_decode(&istream, lin_actuator_fields, &jointPositions);
@@ -233,4 +243,5 @@ void showNanopbData(){
     Serial.print(jointPositions.joint_pos[i], 4);
   }
   Serial.println();
+  return ret;
 }

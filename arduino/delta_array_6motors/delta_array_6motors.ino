@@ -12,11 +12,11 @@
 
 //################################## Feather MC and ADC Libraries INIT #####################3
 // $$$$$$$$$$$ FOR RIGHT SETUP $$$$$$$$$$$$$$$$$
-Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x60);
-Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x61);
+//Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x60);
+//Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x61);
 // $$$$$$$$$$$ FOR LEFT SETUP $$$$$$$$$$$$$$$$$$
-//Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x61);
-//Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x60);
+Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x61);
+Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x60);
 
 Adafruit_ADS1015 ADC1;
 Adafruit_ADS1015 ADC0;
@@ -94,8 +94,13 @@ void setup() {
   MC0.begin();
   MC1.begin();
   // start all the ADCs
-  ADC0.begin(0x49);
-  ADC1.begin(0x4A);
+// For RIGHT SETUP
+//  ADC0.begin(0x49);
+//  ADC1.begin(0x4A);
+
+// For LEFT SETUP
+  ADC0.begin(0x48);
+  ADC1.begin(0x49);
 
   ADC0.setGain(GAIN_ONE);
   ADC1.setGain(GAIN_ONE);

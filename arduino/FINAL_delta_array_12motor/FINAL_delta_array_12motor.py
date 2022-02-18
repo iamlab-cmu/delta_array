@@ -4,7 +4,7 @@ import numpy as np
 from serial import Serial
 from math import *
 import time
-arduino = Serial('/dev/ttyACM1', 57600)  
+arduino = Serial('/dev/ttyACM0', 57600)  
 
 
 delta_message = linear_actuator_pb2.lin_actuator()

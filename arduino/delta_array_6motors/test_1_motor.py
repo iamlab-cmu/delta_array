@@ -1,4 +1,3 @@
-from curses.ascii import NUL
 import linear_actuator_pb2
 import numpy as np
 from serial import Serial
@@ -29,6 +28,6 @@ while True:
     arduino.write(bytes('<', 'utf-8') + serialized + bytes('>', 'utf-8'))
     reachedPos = str(arduino.readline())
     while reachedPos[0]!="~": 
-        print(reachedPos[0], reachedPos[0]!="~")
+        print(reachedPos)
         reachedPos = str(arduino.readline().decode())
     delta_message.Clear()
