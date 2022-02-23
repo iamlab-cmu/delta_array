@@ -1,4 +1,4 @@
-#include "linear_actuator.pb.h"
+#include "delta_array.pb.h"
 #include "pb_common.h"
 #include "pb.h"
 #include "pb_encode.h"
@@ -9,6 +9,7 @@
 #include<math.h>
 
 #define NUM_MOTORS 12
+#define MY_ID 6
 
 //################################## Feather MC and ADC Libraries INIT #####################3
 Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x62);
@@ -64,7 +65,7 @@ float d = 3.75;
 uint8_t input_cmd[numChars];
 bool newData = false;
 
-lin_actuator command = lin_actuator_init_zero;
+DeltaMessage command = DeltaMessage_init_zero;
 static boolean recvInProgress = false;
 static byte ndx = 0;
 char startMarker = 0xA6;
@@ -86,13 +87,13 @@ float last_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 float total_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 int motor_val[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
+bool is_movement_done = false;
 
 //################################# SETUP AND LOOP FUNCTIONS ################################3
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(57600);
-  while (!Serial)
+  Serial1.begin(57600);
+  while (!Serial1)
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
   
   // set all the base dc motor control pins to outputs
@@ -124,7 +125,7 @@ void loop() {
   // put your main code here, to run repeatedly:
   recvWithStartEndMarkers();
   if (newData == true) {
-    if (showNanopbData()){
+    if (decodeNanopbData()){
       writeJointPositions();
     }
     newData = false;
@@ -144,7 +145,7 @@ void readJointPositions(){
 void writeJointPositions(){
   bool reached_point = false;
   last_arduino_time = millis();
-//  Serial.pri/nt("?? id: X");Serial.print("; Joint /Pos: ");
+  is_movement_done = false;
   while (!reached_point){
     current_arduino_time = millis();
     time_elapsed = float(current_arduino_time - last_arduino_time) / 1000.0;
@@ -170,7 +171,6 @@ void writeJointPositions(){
         total_joint_errors[i] += joint_errors[i];
       }
       else{
-//        Serial.prin/t(joint_positions[i]);
         reached_point = reached_point && true;;
         motors[i]->setSpeed(0);
         motors[i]->run(RELEASE);
@@ -179,14 +179,14 @@ void writeJointPositions(){
     }
     last_arduino_time = current_arduino_time;
   }
-//  Serial.pr/intln();
-  for(int i = 0; i < 12; i++)
-    {
+  for(int i = 0; i < 12; i++){
       motors[i]->setSpeed(0);
       motors[i]->run(RELEASE);
       total_joint_errors[i] = 0.0;
-    }
-  Serial.println("~ Moved to New Position");
+  }
+  is_movement_done = true;
+   
+//  Serial.println("~ Moved to New Position");
 }
 
 //########################### STOP OR RESET FUNCTIONS ######################################3
@@ -209,8 +209,8 @@ void stop(){
 //############################ SERIAL COMM FUNCTIONS #######################################3
 void recvWithStartEndMarkers() {
   byte rc;
-  while (Serial.available() > 0 && newData == false) {
-    rc = Serial.read();
+  while (Serial1.available() > 0 && newData == false) {
+    rc = Serial1.read();
 
     if (recvInProgress == true) {
       if (rc != endMarker) {
@@ -233,15 +233,35 @@ void recvWithStartEndMarkers() {
   }
 }
 
-bool showNanopbData(){  
-  lin_actuator jointPositions = lin_actuator_init_zero;
-  pb_istream_t istream = pb_istream_from_buffer(input_cmd, ndx);
-  bool ret = pb_decode(&istream, lin_actuator_fields, &jointPositions);
-  Serial.print("id: ");Serial.print(jointPositions.id);Serial.print("; Joint Pos: ");
+void sendJointPositions(){
+  Serial1.print("~id:");Serial1.print(MY_ID);Serial1.print(" ");
   for (int i=0; i<NUM_MOTORS; i++){
-    new_joint_positions[i] = jointPositions.joint_pos[i];
-    Serial.print(jointPositions.joint_pos[i], 4);
+    Serial1.print(joint_positions[i], 4);Serial1.print(" ");
   }
-  Serial.println();
+  Serial1.println();
+}
+
+bool decodeNanopbData(){  
+  DeltaMessage message = DeltaMessage_init_zero;
+  pb_istream_t istream = pb_istream_from_buffer(input_cmd, ndx);
+  bool ret = pb_decode(&istream, DeltaMessage_fields, &message);
+  if (message.id == MY_ID){
+    if (message.request_done_state){
+        sendJointPositions();
+    }
+    else if (message.reset){
+      for (int i=0; i<NUM_MOTORS; i++){
+        new_joint_positions[i] = 0.05;
+      }
+    }
+    else{
+      for (int i=0; i<NUM_MOTORS; i++){
+        new_joint_positions[i] = message.joint_pos[i];
+      }
+    }
+  }
+  else{
+    ret = false;
+  }
   return ret;
 }
