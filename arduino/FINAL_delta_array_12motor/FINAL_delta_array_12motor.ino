@@ -9,7 +9,7 @@
 #include<math.h>
 
 #define NUM_MOTORS 12
-#define MY_ID 6
+#define MY_ID 16
 
 //################################## Feather MC and ADC Libraries INIT #####################3
 Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x62);
@@ -247,7 +247,7 @@ bool decodeNanopbData(){
   bool ret = pb_decode(&istream, DeltaMessage_fields, &message);
   if (message.id == MY_ID){
     if (message.request_done_state){
-        sendJointPositions();
+//        sendJointPositions();
     }
     else if (message.reset){
       for (int i=0; i<NUM_MOTORS; i++){

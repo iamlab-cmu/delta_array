@@ -1,4 +1,3 @@
-from ast import Del
 import delta_array_pb2
 import numpy as np
 from serial import Serial
@@ -9,7 +8,7 @@ from FINAL_delta_array_12motor import DeltaArrayAgent
 
 arduino = Serial('COM7', 57600)
 
-DDA = DeltaArrayAgent(arduino, 4)
+DDA = DeltaArrayAgent(arduino, 1)
 s_p = 1.5 #side length of the platform
 s_b = 4.3 #side length of the base
 l = 4.5 #length of leg attached to platform
@@ -31,7 +30,7 @@ while True:
     pts = np.array(pts) * 0.01
     jts = create_joint_positions(pts)
     DDA.move_joint_position(jts)
-    DDA.get_joint_positions()
+    # DDA.get_joint_positions()
 
     
 

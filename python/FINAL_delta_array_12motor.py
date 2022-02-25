@@ -7,7 +7,7 @@ import time
 from Prismatic_Delta import Prismatic_Delta
 
 NUM_MOTORS = 12
-NUM_AGENTS = [1,3,4,5]
+NUM_AGENTS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14]
 s_p = 1.5 #side length of the platform
 s_b = 4.3 #side length of the base
 l = 4.5 #length of leg attached to platform
@@ -172,10 +172,9 @@ class DeltaArrayEnv:
             for i in NUM_AGENTS:
                 print(i)
                 self.agents[i].move_joint_position(gait)
-                time.sleep(0.5)
-            for i in NUM_AGENTS:
-                self.agents[i].get_joint_positions()
-            time.sleep(0.3)
+            # for i in NUM_AGENTS:
+            #     self.agents[i].get_joint_positions()
+            time.sleep(1.5)
 
 if __name__=="__main__":
     env = DeltaArrayEnv("COM7")
