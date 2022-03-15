@@ -9,7 +9,7 @@
 #include<math.h>
 
 #define NUM_MOTORS 12
-#define MY_ID 16
+#define MY_ID 9
 
 //################################## Feather MC and ADC Libraries INIT #####################3
 Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x62);
