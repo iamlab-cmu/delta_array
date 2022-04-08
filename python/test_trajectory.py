@@ -33,11 +33,13 @@ def create_joint_positions(val):
             a.append(val[j])
     return a
 
-while True:
-    x = input("Position in cm? ")
-    ee_pts = list(np.array(x.split(","), dtype=float))
+traj = [[np.cos(theta), np.sin(theta), 10] for theta in np.arange(0, np.pi*2, 0.6)]
+
+for t in traj:
+    # x = input("Position in cm? ")
+    # ee_pts = list(np.array(x.split(","), dtype=float))
     # print(ee_pts)
-    pts = Delta.IK(ee_pts)
+    pts = Delta.IK(t)
     pts = np.array(pts) * 0.01
     jts = create_joint_positions(pts)
     DDA.move_joint_position(jts)

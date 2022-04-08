@@ -1,4 +1,5 @@
 from audioop import alaw2lin
+import telnetlib
 import delta_array_pb2
 import numpy as np
 from serial import Serial
@@ -23,12 +24,14 @@ class DeltaArrayAgent:
     def __init__(self, ser, robot_id):
         self.arduino = ser
         self.delta_message = delta_array_pb2.DeltaMessage()
+        self.input_delta_message = delta_array_pb2.DeltaMessage()
         self.delta_message.id = robot_id
         self.delta_message.request_joint_pose = False
         self.delta_message.request_done_state = False
         self.delta_message.reset = False
         self.min_joint_pos = 0.005
-        self.max_joint_pos = 0.0988
+        self.max_joint_pos = 0.095
+        self.self_pose = np.zeros((1,12))
 
         self.done_moving = False
         self.current_joint_positions = [0.05]*12
@@ -47,19 +50,31 @@ class DeltaArrayAgent:
     #     self.delta_message.request_done_state = self.delta_message.request_done_state
     #     self.delta_message.reset = self.delta_message.reset
 
-
     def send_proto_cmd(self, ret_expected = False):
         serialized = self.delta_message.SerializeToString()
-        self.arduino.write(bytes(b'\xa6') + serialized + bytes(b'\xa7'))
+        # print(serialized)
+        self.arduino.write(b'\xa6~~'+ serialized + b'\xa7~~\r\n')
         if ret_expected:
-            reachedPos = str(self.arduino.readline())
-            # print(reachedPos.split(" "))
-            reachedPos = reachedPos.strip().split(" ")
-            if self.delta_message.id == int(reachedPos[0].split(':')[-1]):
-                return [float(x) for x in reachedPos[1:-1]]
+            # reachedPos = str(self.arduino.read_all())
+            reachedPos = self.arduino.read_until(b"\r\n", timeout=3)
+            # print(reachedPos.strip())
+            print(reachedPos[3:-5])
+            self.input_delta_message.ParseFromString(reachedPos[3:-5])
+            if self.input_delta_message.id==self.delta_message.id:
+                self.input_delta_message.id = -1
+                self.self_pose = np.array(self.input_delta_message.joint_pos)
+                return True
             else:
-                print("ERROR, incorrect robot ID requested.")
-                return [0.05]*12
+                self.input_delta_message.id = -1
+                return False
+
+
+    def test_sashank(self, desired_joint_positions):
+        desired_joint_positions = np.clip(desired_joint_positions,self.min_joint_pos,self.max_joint_pos)
+        # Add joint positions to delta_message protobuf
+        _ = [self.delta_message.joint_pos.append(desired_joint_positions[i]) for i in range(12)]
+        self.send_proto_cmd()
+        del self.delta_message.joint_pos[:]
 
 
     def move_joint_position(self, desired_joint_positions):
@@ -67,7 +82,7 @@ class DeltaArrayAgent:
         # Add joint positions to delta_message protobuf
         _ = [self.delta_message.joint_pos.append(desired_joint_positions[i]) for i in range(12)]
         self.send_proto_cmd()
-        print(self.delta_message)
+        # print(self.delta_message)
         del self.delta_message.joint_pos[:]
 
     def close(self):
@@ -177,7 +192,38 @@ class DeltaArrayEnv:
             time.sleep(1.5)
 
 if __name__=="__main__":
-    env = DeltaArrayEnv("COM7")
+    # env = DeltaArrayEnv("COM7")
     # env = DeltaArrayEnv("/dev/tty7")
     # env.move_over_trajectory("vertical")
-    env.planar_translation()
+    # print(type(0.0308392029256111111111111111111111))
+    vals =  np.array([0.0308392029256,  0.0308538898826,  0.0308538898826, 0.0303948651999, 0.0312020219862, 0.0312020219862, 0.0299999993294, 0.0299999993294, 0.0299999993294, 0.0299999993294, 0.03, 0.03])
+    
+    host = "192.168.0.182"
+    port = 80
+    timeout = 100
+
+    esp01 = telnetlib.Telnet(host, port, timeout)
+    agent = DeltaArrayAgent(esp01,1)
+
+    agent.test_sashank(vals)
+    # print(Delta.IK([-3,-2.95,13.699999999999969]))
+    # for i in np.arange(-2,2,0.1):
+    #     for j in np.arange(-2,2,0.1):
+    #         for k in np.arange(6,16,0.1):
+    #             # print(i,j,k)
+    #             i,j,k = np.around(i,5),np.around(j,5),np.around(k,5)
+    #             val = Delta.IK([i,j,k])
+    #             val = np.array(val)/100
+    #             vals = np.concatenate([val,val,val,val])
+    #             # print(val)
+    #             serialized= agent.test_sashank(vals)
+    #             if b'xa7~~' in serialized:
+    #                 print("HAKUNA")
+    #                 print(i,j,k)
+    #                 print(serialized)
+    #             else:
+    #                 # print(serialized)
+    #                 continue
+    #                 # print(serialized)
+
+    # env.planar_translation()

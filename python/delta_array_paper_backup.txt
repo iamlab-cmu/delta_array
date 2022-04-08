@@ -1,0 +1,131 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+%        1         2         3         4         5         6         7         8
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}
+\IEEEoverridecommandlockouts
+\overrideIEEEmargins
+
+%DELTAZ RAL 2022
+
+
+% For nicer multiple citations
+\usepackage{cite}
+\usepackage{array}
+\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
+\usepackage{booktabs}
+\usepackage{censor}
+\usepackage{hyperref}
+\usepackage[belowskip=-4pt,aboveskip=0pt]{caption}
+
+% For line numbers in peer review
+\usepackage[pagewise]{lineno}
+\setlength\linenumbersep{3pt}
+
+% For figures
+\usepackage{graphicx}
+\graphicspath{{./figures/}}
+% \usepackage{subcaption}
+\usepackage{subfig}
+% \usepackage{floatrow}
+
+\title{\LARGE \bf
+Linear Delta Arrays
+}
+
+\author{Sarvesh Patil$^{*1}$, Tony Tao$^{*2}$, Pragna Mannam$^{1}$,  Oliver Kroemer$^{1}$,  F. Zeynep Temel$^{1}$% <-this % stops a space
+% \thanks{$^{*}$Indicates equal contribution.
+\\\textbf{Author list and order TBD, discuss before deadline}
+\thanks{$^{1}$S. Patil, P. Mannam, O. Kroemer, and F. Z. Temel are with the Robotics Institute, Carnegie Mellon University, 
+        Pittsburgh, PA 15213, USA
+        {\tt\small \{sarveshp, pmannam, okroemer, ztemel\} @andrew.cmu.edu}}%
+\thanks{$^{2}$S.C. Alvares is with the Robotics Institute Summer Scholars at Carnegie Mellon University, Pittsburgh, PA 15213, USA and also with Rose-Hulman Institute of Technology, Terre Haute, IN 47803, USA
+        {\tt\small alvaresc@rose-hulman.edu}} \\
+\authorblockA{\url{https://github.com/ZoomLabCMU/DeltaZ}}}
+
+\begin{document}
+% \linenumbers % Uncomment this to enable line numbers in the peer review
+
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+\begin{abstract}
+This paper presents an array of Delta robots with compliant 3D-printed parallelogram links, which opens capabilities for near-planar transportation and deformable object manipulation. Typically, Delta robot designs utilize rigid joints and links to support the end effector. However, that restricts the workspace that these robots can operate in, when placed closed to each other, which limits the designing capabilities of standard delta robots. We take advantage of the compliant design of the Soft-Delta robots, and arrange them in an $8\times8$ grid array. We demonstrate the ability of the delta arrays for planar translation and rotation in this work using alternating dynamic contacts.
+\end{abstract}
+
+\begin{keywords} % UPDATE
+Education Robotics, Parallel Robots, Compliant Joints and Mechanisms, Additive Manufacturing, Soft Robot Applications, Flexible Robotics, Kinematics
+%Telerobotics and Teleoperation, Physical Human-Robot Interaction, Actuation and Joint Mechanisms
+%keywords, choose from \\ https://www.ieee-ras.org/publications/ra-l/keywords
+\end{keywords}
+
+
+\section{Introduction}
+Motivation - distributed and dexterous manipulation
+
+The delta arrays are a distributed manipulation system that can achieve a wide range of manipulation tasks through dynamic contacts and cooperation. A proof of concept was recently shown by Thompson et al., in !CITE DELTA ARRAY SIMULATOR!. This work translates the design choices from simulation, into a real, working robot system of delta robots arranged in an 8x8 hexagonal grid pattern. 
+
+. It has been inspired from the low-cost compliant gripper design 
+
+
+\section{Related Work}
+
+
+\section{Delta Array Design}
+Since the rigid body delta manipulators can not handle the stress of collisions against other delta robots, the low-cost compliant gripper design in !CITE RSS DELTA! has been utilized in this project to minimize maintenance, and take advantage of the compliance of the 3D-printed soft delta links. To accomplish non-prehensile dexterous manipulation tasks effectively, the workspace of each robot intersects greatly with that of it's neighbors allowing for the development of cooperative algorithms for robotic manipulation.
+
+\subsection{Grippers}
+The delta arrays greatly benefit from the low Young's modulus that thermoplastic polyurethane (TPU) offers especially when it comes to collisions against other links in the array. In this work, we design delta links with 0.375mm hinges and 4.5mm thick beams 3D-printed with TPU. The soft links allow the end effector to remain parallel to the base in a radius of about 1.5cm, after which it starts tilting depending on the radial distance. The distance between each delta robot in the array compensates for the tilting, by mitigating any need for the robot to go outside of the 1.5cm radius from it's center. 
+
+\subsection{Actuators}
+Generally delta robots are made with rotational actuators like servo motors, that provide torque to individual links resulting in speedy movements of the end effector at the cost of a bulky base for the robot. This curbs the opportunity to create a closely stacked array of delta robots. In this work, we utilize the novel linear delta robot architecture which enables us to place each robot in close proximity of another. The linear actuators manufactured by Actuonix possess a 50:1 gear ratio and operate at 12V and 1A, i.e. 12W peak power capacity. Although these linear actuators come in the form of precise position control (linear servos), it limits the future scope of the delta arrays where velocity among different actuators needs to be controlled with high granularity. Thus, we use linear actuators with an internal potentiometer that can provide analog feedback for position control. 
+
+The workspace provided by the grippers extends over the length of the linear actuators. In this work, we use 10cm long linear actuators to drive the delta links, and in-turn, the end-effector in a dexterous workspace of about [-3cm, 3cm] on $X$ and $Y$ axes, and [5cm, 15cm] on the $Z$-axis. However, since we stack the delta arrays close to each other, the effective workspace is clipped at [-1 cm, 1 cm] for each robot in order to prevent excessive collisions and jamming with other robots with overlapping workspaces. 
+
+\section{Modular Array Structure}
+Although in this paper we present the delta arrays in an $8\times8$ grid formation, each component of the array is divided into a $2\times2$ module which can be stacked in any desirable formation. The modularity of design allows for the delta array to be readily expanded or contracted to fit the needs of the application. We present the array in the $8\times8$ configuration as it allows the manipulation of objects of a range of sizes !GIVE SIZE RANGE?! and demonstrates the potential of such arrays in dexterous tasks.
+
+\section{$2\times 2$ Linear Delta Module}
+The $2\times2$ linear delta module offers the ideal balance between modularity and ease of maintenance. Since we position 4 delta robots into each of these modules, only 16 modules need to be managed instead of 64 individually controlled deltas on the management scale. This also allows us to utilize the powerful computation of a single state-of-the-art micro-controller
+in a small form factor and control 4 delta robots in a $2\times2$ grid from a single device. 
+
+\subsection{Linear-Axis Delta (Mounts? Do you mean to talk about mounts here?)}
+Each $2\times2$ module is mounted on a hexagon structure as shown in **Fig1. INSERT FIGURE HERE**. The linear actuator bodies are held together using two such plexiglass plates that are precisely laser cut 
+
+\subsection{Electronics}
+Originally, the linear deltas were controlled using an Arduino Mega which has significantly wide dimensions, making it infeasible to be used in a compact form factor system. Hence, we used Adafruit Feather M0 boards that occupy a much smaller volume while still providing enough compute to control 4 delta robots (12 linear actuators) simultaneously. To control the linear deltas, we use the Adafruit DC Motor/Stepper FeatherWing and send PWM signals to control the velocity of the end effector. On top the FeatherWing, we attach an ADS1015 12-bit ADC with 4 channel programmable gain amplifier. Further, since each FeatherWing has precisely 4 motor driver channels, we couple the position feedback from each of the 4 linear actuators with the ADC for precise position control, which also provides an additional benefit of working as a low pass filter and eliminating high frequency noise from electromagnetic interference generated in the circuit.
+
+We use the I2C bus on the Feather M0 to send and receive commands to the FeatherWing and the ADC. To control 12 linear actuators, we stack up 3 FeatherWings and ADC pairs using a custom circuit that takes care of the I2C address adders as well as power delivery to the FeatherWing's motor drivers. The FeatherWing I2C addresses are 0x60, 0x61, and 0x62, and those of the ADCs are 0x48, 0x49, and 0x4A respectively. A 12V 1A DC adapter is used to deliver the power through a barrel jack, which is then distributed across the FeatherWings using the shield circuit. The main benefit of the electronics choices comes from the fact that post-assembly, the entire circuit has a form factor of about $50mm\times60mm\times40mm$, which can be easily placed inside the circuit holding box without damaging the components. 
+
+\section{Communication}
+The central control of the delta arrays is structured as various classes in Python. There are 3 main classes 
+
+In order to command the delta arrays, the control algorithms are written in Python which sends desired joint positions to the Feather M0. The commands from Python are sent serially using a CP2102 (RS232-to-TTL converter) UART module. They are serially communicated to each of the $2\times2$ modules, which internally runs a PID loop for position control across the 4 linear delta robots via the I2C bus. Since each Feather M0 has an internal pull-up resistor, we chain multiple devices on a single line and send commands to each of them without loss of information. However, due to the lack of an internal pull-up resistor in the CP2102 circuit design, signals get heavily attenuated while receiving feedback from the microcontrollers, which limits the frequency of communication. We plan on eliminating all phsyical communication and replacing it with wireless modules as a part of future work. 
+
+\section{Distributed Manipulation Strategies}
+
+\subsection{2-beat Gait}
+
+\subsection{Planar Translation Primitive}
+
+\subsection{Planar Rotation Primitive}
+
+\subsection{Wall Primitive}
+
+
+\section{Experiments}
+
+\section{Conclusion}
+We proposed the DeltaZ  design for creating an accessible robot platform for research and education. The 3D printed robot is easy to assemble and maintain, and it can be used to perform a variety of translational manipulation tasks. Our experiments demonstrated the robot's ability to perform precise repetitive tasks that exploit the robot's inherent compliance. We also demonstrated the utility of the robot as a benchmarking platform. In the future, we will explore extending the platform with additional sensors to perform various tasks, as well as create accompanying teaching materials to develop an educational kit. 
+
+
+
+\section{Acknowledgements}
+The research presented in this work was funded by the
+National Science Foundation under project Grant No. CMMI-2024794.
+
+\nocite{*}  % Without this, cite articles in text using \cite{...}
+\bibliographystyle{IEEEtran}
+\bibliography{./IEEEfull,refs}
+
+\end{document}
