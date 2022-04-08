@@ -1,4 +1,4 @@
-#include "delta_array.pb.h"
+#include "delta_trajectory.pb.h"
 #include "pb_common.h"
 #include "pb.h"
 #include "pb_encode.h"
@@ -9,7 +9,7 @@
 #include<math.h>
 
 #define NUM_MOTORS 12
-#define MY_ID 9
+#define MY_ID 1
 
 //################################## Feather MC and ADC Libraries INIT #####################3
 Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x62);
@@ -58,17 +58,15 @@ int channels[NUM_MOTORS] = {0,1,0,//1st robot
 //##################################### GLOBAL VARIABLES ###################################3
 const int numChars = 128;
 float pi = 3.1415926535;
-float p = 300.0;
-float i_pid = 0.1;
-float d = 3.75;
 
 uint8_t input_cmd[numChars];
 bool newData = false;
 
-DeltaMessage command = DeltaMessage_init_zero;
+DeltaMessage message = DeltaMessage_init_zero;
 static boolean recvInProgress = false;
 static byte ndx = 0;
 char startMarker = 0xA6;
+char confMarker = '~';
 char endMarker = 0xA7;
 
 unsigned long current_arduino_time;
@@ -78,7 +76,6 @@ float time_elapsed;
 float joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float new_joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-float position_threshold = 0.0008;
 float joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 // We need last_joint_errors to compute PID control value for d. 
@@ -92,7 +89,8 @@ bool is_movement_done = false;
 //################################# SETUP AND LOOP FUNCTIONS ################################3
 void setup() {
   // put your setup code here, to run once:
-  Serial1.begin(57600);
+  Serial.begin(115200);
+  Serial1.begin(115200);
   while (!Serial1)
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
   
@@ -116,6 +114,21 @@ void setup() {
     delay(10);
   }
   
+  Serial.println("started");
+  Serial1.println("AT+GMR");
+  delay(500);
+  Serial1.println("AT+CWMODE=1");
+  delay(500);
+  Serial1.println("AT+CIFSR");
+  delay(500);
+  Serial1.println("AT+CIPMUX=1");
+  delay(500);
+  Serial1.println("AT+CIPSERVER=1,80");
+  delay(500);
+  Serial1.println("AT+CIPSTAMAC?");
+  delay(500);
+  printIPAddr();
+  
   readJointPositions();
 //  resetJoints();
 //  stop();
@@ -125,143 +138,17 @@ void loop() {
   // put your main code here, to run repeatedly:
   recvWithStartEndMarkers();
   if (newData == true) {
+//    printIPAddr();
     if (decodeNanopbData()){
       writeJointPositions();
     }
     newData = false;
     ndx = 0;
   }
-//  writeJointPositions();
-}
-
-//############################# READ / WRITE JOINT POSITIONS #######################################3
-void readJointPositions(){
-  for(int i = 0; i < NUM_MOTORS; i++){
-    motor_val[i] = adcs[i]->readADC_SingleEnded(channels[i]); 
-    joint_positions[i] = motor_val[i] * 0.00006; // 100mm / 1650
-  }
-}
-
-void writeJointPositions(){
-  bool reached_point = false;
-  last_arduino_time = millis();
-  is_movement_done = false;
-  while (!reached_point){
+  else{
     current_arduino_time = millis();
-    time_elapsed = float(current_arduino_time - last_arduino_time) / 1000.0;
-    readJointPositions();
-    reached_point = true;
-    for(int i = 0; i < NUM_MOTORS; i++){
-      joint_errors[i] = joint_positions[i] - new_joint_positions[i];
-      
-      float pid = p * joint_errors[i] + i_pid * total_joint_errors[i] + d * (joint_errors[i] - last_joint_errors[i]) / time_elapsed;
-      
-      if(joint_errors[i] > position_threshold){
-        int motor_speed = (int)(min(max(0.0, pid), 1.0) * 255.0);
-        reached_point = reached_point && false;
-        motors[i]->setSpeed(motor_speed);
-        motors[i]->run(BACKWARD);
-        total_joint_errors[i] += joint_errors[i];
-      }
-      else if(joint_errors[i] < -position_threshold){
-        int motor_speed = (int)(min(max(-1.0, pid), 0.0) * -255.0);
-        reached_point = reached_point && false;
-        motors[i]->setSpeed(motor_speed);
-        motors[i]->run(FORWARD);
-        total_joint_errors[i] += joint_errors[i];
-      }
-      else{
-        reached_point = reached_point && true;;
-        motors[i]->setSpeed(0);
-        motors[i]->run(RELEASE);
-        total_joint_errors[i] = 0.0;
-      }
-    }
+    time_elapsed = float(current_arduino_time - last_arduino_time)/1000;
     last_arduino_time = current_arduino_time;
   }
-  for(int i = 0; i < 12; i++){
-      motors[i]->setSpeed(0);
-      motors[i]->run(RELEASE);
-      total_joint_errors[i] = 0.0;
-  }
-  is_movement_done = true;
-   
-//  Serial.println("~ Moved to New Position");
-}
-
-//########################### STOP OR RESET FUNCTIONS ######################################3
-void resetJoints(){
-  for(int i = 0; i < NUM_MOTORS; i++)
-  {
-    new_joint_positions[i] = 0.0;
-  }
-  writeJointPositions();
-}
-
-void stop(){
-  // Turn off all motors
-  for(int i = 0; i < NUM_MOTORS; i++)
-  {
-    motors[i]->run(RELEASE);
-  }
-}
-
-//############################ SERIAL COMM FUNCTIONS #######################################3
-void recvWithStartEndMarkers() {
-  byte rc;
-  while (Serial1.available() > 0 && newData == false) {
-    rc = Serial1.read();
-
-    if (recvInProgress == true) {
-      if (rc != endMarker) {
-        input_cmd[ndx] = rc;
-        ndx++;
-        if (ndx >= numChars) {
-          ndx = numChars - 1;
-        }
-      }
-      else {
-        input_cmd[ndx] = '\0'; // terminate the string
-        recvInProgress = false;
-        newData = true;
-      }
-    }
-
-    else if (rc == startMarker) {
-      recvInProgress = true;
-    }
-  }
-}
-
-void sendJointPositions(){
-  Serial1.print("~id:");Serial1.print(MY_ID);Serial1.print(" ");
-  for (int i=0; i<NUM_MOTORS; i++){
-    Serial1.print(joint_positions[i], 4);Serial1.print(" ");
-  }
-  Serial1.println();
-}
-
-bool decodeNanopbData(){  
-  DeltaMessage message = DeltaMessage_init_zero;
-  pb_istream_t istream = pb_istream_from_buffer(input_cmd, ndx);
-  bool ret = pb_decode(&istream, DeltaMessage_fields, &message);
-  if (message.id == MY_ID){
-    if (message.request_done_state){
-//        sendJointPositions();
-    }
-    else if (message.reset){
-      for (int i=0; i<NUM_MOTORS; i++){
-        new_joint_positions[i] = 0.05;
-      }
-    }
-    else{
-      for (int i=0; i<NUM_MOTORS; i++){
-        new_joint_positions[i] = message.joint_pos[i];
-      }
-    }
-  }
-  else{
-    ret = false;
-  }
-  return ret;
+//  writeJointPositions();
 }
