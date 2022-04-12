@@ -1,4 +1,3 @@
-from sympy import Q
 import delta_array_pb2
 import numpy as np
 from serial import Serial
@@ -38,6 +37,7 @@ while True:
     ee_pts = list(np.array(x.split(","), dtype=float))
     # print(ee_pts)
     pts = Delta.IK(ee_pts)
+    # print(pts)
     pts = np.array(pts) * 0.01
     jts = create_joint_positions(pts)
     DDA.move_joint_position(jts)
