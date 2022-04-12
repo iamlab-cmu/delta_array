@@ -11,6 +11,7 @@
 #define NUM_MOTORS 12
 #define MY_ID 1
 
+
 //################################## Feather MC and ADC Libraries INIT #####################3
 Adafruit_MotorShield MC0 = Adafruit_MotorShield(0x62);
 Adafruit_MotorShield MC1 = Adafruit_MotorShield(0x60);
@@ -54,17 +55,17 @@ int channels[NUM_MOTORS] = {0,1,0,//1st robot
                             3,2,3,//4th robot
                             };
 //int channels[NUM_MOTORS] = {3};
-
 //##################################### GLOBAL VARIABLES ###################################3
-const int numChars = 128;
+const int numChars = 12500;
 float pi = 3.1415926535;
 
 uint8_t input_cmd[numChars];
 bool newData = false;
 
+JointPos jt_pos = JointPos_init_zero;
 DeltaMessage message = DeltaMessage_init_zero;
 static boolean recvInProgress = false;
-static byte ndx = 0;
+int ndx = 0;
 char startMarker = 0xA6;
 char confMarker = '~';
 char endMarker = 0xA7;
@@ -75,6 +76,10 @@ float time_elapsed;
 
 float joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float new_joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+float trajectory[20][12];
+int traj_iter = 0;
+bool go = false;
+//float new_trajectory[20][12];
 
 float joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -140,15 +145,12 @@ void loop() {
   if (newData == true) {
 //    printIPAddr();
     if (decodeNanopbData()){
-      writeJointPositions();
+      updateTrajectory();
+//      writeJointPositions();
     }
     newData = false;
     ndx = 0;
   }
-  else{
-    current_arduino_time = millis();
-    time_elapsed = float(current_arduino_time - last_arduino_time)/1000;
-    last_arduino_time = current_arduino_time;
-  }
-//  writeJointPositions();
+  
+//  executeTrajectory();
 }

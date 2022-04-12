@@ -6,10 +6,7 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
-PB_BIND(JointPos, JointPos, AUTO)
-
-
-PB_BIND(DeltaMessage, DeltaMessage, 2)
+PB_BIND(DeltaMessage, DeltaMessage, 4)
 
 
 

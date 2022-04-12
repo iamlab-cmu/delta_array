@@ -5,6 +5,14 @@ float d = 4;
 
 float position_threshold = 0.00035;
 //############################# READ / WRITE JOINT POSITIONS #######################################3
+void executeTrajectory(){
+  if(traj_iter < 20 && go){
+    memcpy(new_joint_positions, trajectory[traj_iter], 12);
+    writeJointPositions();
+    traj_iter += 1; 
+  }
+}
+
 void readJointPositions(){
   for(int i = 0; i < NUM_MOTORS; i++){
     motor_val[i] = adcs[i]->readADC_SingleEnded(channels[i]); 

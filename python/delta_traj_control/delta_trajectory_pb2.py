@@ -14,19 +14,11 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x64\x65lta_trajectory.proto\"\x1d\n\x08JointPos\x12\x11\n\tjoint_pos\x18\x01 \x03(\x02\"\x80\x01\n\x0c\x44\x65ltaMessage\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x1d\n\ntrajectory\x18\x02 \x03(\x0b\x32\t.JointPos\x12\x1a\n\x12request_done_state\x18\x03 \x01(\x08\x12\x1a\n\x12request_joint_pose\x18\x04 \x01(\x08\x12\r\n\x05reset\x18\x05 \x01(\x08\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x64\x65lta_trajectory.proto\"u\n\x0c\x44\x65ltaMessage\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x12\n\ntrajectory\x18\x02 \x03(\x02\x12\x1a\n\x12request_done_state\x18\x03 \x01(\x08\x12\x1a\n\x12request_joint_pose\x18\x04 \x01(\x08\x12\r\n\x05reset\x18\x05 \x01(\x08\x62\x06proto3')
 
 
 
-_JOINTPOS = DESCRIPTOR.message_types_by_name['JointPos']
 _DELTAMESSAGE = DESCRIPTOR.message_types_by_name['DeltaMessage']
-JointPos = _reflection.GeneratedProtocolMessageType('JointPos', (_message.Message,), {
-  'DESCRIPTOR' : _JOINTPOS,
-  '__module__' : 'delta_trajectory_pb2'
-  # @@protoc_insertion_point(class_scope:JointPos)
-  })
-_sym_db.RegisterMessage(JointPos)
-
 DeltaMessage = _reflection.GeneratedProtocolMessageType('DeltaMessage', (_message.Message,), {
   'DESCRIPTOR' : _DELTAMESSAGE,
   '__module__' : 'delta_trajectory_pb2'
@@ -37,8 +29,6 @@ _sym_db.RegisterMessage(DeltaMessage)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _JOINTPOS._serialized_start=26
-  _JOINTPOS._serialized_end=55
-  _DELTAMESSAGE._serialized_start=58
-  _DELTAMESSAGE._serialized_end=186
+  _DELTAMESSAGE._serialized_start=26
+  _DELTAMESSAGE._serialized_end=143
 # @@protoc_insertion_point(module_scope)
