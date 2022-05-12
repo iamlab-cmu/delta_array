@@ -9,7 +9,7 @@ import telnetlib
 import delta_trajectory_pb2
 from control_delta_arrays import DeltaArrayAgent
 
-host = "192.168.0.182"
+host = "192.168.0.179"
 port = 80
 timeout = 100
 
@@ -39,7 +39,6 @@ if __name__=="__main__":
     # plt.show()
     
     delta_message = delta_trajectory_pb2.DeltaMessage()
-    jt_pos = delta_trajectory_pb2.JointPos()
 
     delta_message.id = 1
     delta_message.request_joint_pose = False
@@ -55,21 +54,41 @@ if __name__=="__main__":
             pts = np.array(pts) * 0.01
             pts = np.clip(pts,0.005,0.095)
             jts = create_joint_positions(pts)
-            jt_pos.joint_pos.extend(jts)
-            delta_message.trajectory.append(jt_pos)
-            del jt_pos.joint_pos[:]
+            _ = [delta_message.trajectory.append(jts[i]) for i in range(12)]
 
         serialized = delta_message.SerializeToString()
-        for i in range(20):
-            print(delta_message.trajectory[i])
+        
+        print(len(serialized))
+        print(len(delta_message.trajectory))
         # print(serialized)
-        # if b"\xa7~~" in serialized:
+        if b"\xa7" in serialized:
+            print("HAKUNA")
+            
+        # if b"n" in serialized:
         #     print("HAKUNA")
             
-        # if b"\xa6~~" in serialized:
-        #     print("HAKUNA")
-            
-        esp01.write(b'\xa6~~' + serialized + b'\xa7~~\r\n')
+        esp01.write(b'\xa6~~'+ serialized + b'\xa7~~\r\n')
         
         del delta_message.trajectory[:]
         print(delta_message)
+
+
+    # for i in np.arange(-2,2,0.1):
+    #     for j in np.arange(-2,2,0.1):
+    #         for k in np.arange(6,16,0.1):
+    #             val = Delta.IK([i,j,k])
+    #             val = np.array(val)/100
+    #             vals = np.concatenate([val,val,val,val])
+                
+    #             for n in range(20):
+    #                 _ = [delta_message.trajectory.append(vals[i]) for i in range(12)]
+    #             serialized= delta_message.SerializeToString()
+    #             del delta_message.trajectory[:]
+    #             if b'p' in serialized:
+    #                 print("HAKUNA")
+    #                 # print(i,j,k)
+    #                 print(len(serialized))
+    #             else:
+    #                 # print(serialized)
+    #                 continue
+    #                 # print(serialized)

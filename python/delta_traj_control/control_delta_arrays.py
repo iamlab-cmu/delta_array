@@ -25,7 +25,7 @@ class DeltaArrayAgent:
     def __init__(self, ser, robot_id):
         self.arduino = ser
         self.delta_message = delta_trajectory_pb2.DeltaMessage()
-        self.joint_pos = delta_trajectory_pb2.JointPos()
+        # self.joint_pos = delta_trajectory_pb2.JointPos()
         self.delta_message.id = robot_id
         self.delta_message.request_joint_pose = False
         self.delta_message.request_done_state = False
@@ -37,9 +37,9 @@ class DeltaArrayAgent:
         
         a = np.ones((50,12))*0.05
         # a = a.tolist()
-        for i in range(50):
-            self.joint_pos.joint_pos.extend(a[i])
-            self.delta_message.trajectory.append(self.joint_pos)
+        # for i in range(50):
+        #     self.joint_pos.joint_pos.extend(a[i])
+        #     self.delta_message.trajectory.append(self.joint_pos)
         self.current_joint_positions = a
 
     # GENERATE RESET and STOP commands in protobuf
