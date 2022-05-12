@@ -56,19 +56,19 @@ int channels[NUM_MOTORS] = {0,1,0,//1st robot
                             };
 //int channels[NUM_MOTORS] = {3};
 //##################################### GLOBAL VARIABLES ###################################3
-const int numChars = 12500;
+const int numChars = 1500;
 float pi = 3.1415926535;
 
 uint8_t input_cmd[numChars];
 bool newData = false;
 
-JointPos jt_pos = JointPos_init_zero;
 DeltaMessage message = DeltaMessage_init_zero;
 static boolean recvInProgress = false;
 int ndx = 0;
 char startMarker = 0xA6;
 char confMarker = '~';
 char endMarker = 0xA7;
+int marker_count = 0;
 
 unsigned long current_arduino_time;
 unsigned long last_arduino_time;
@@ -130,8 +130,6 @@ void setup() {
   delay(500);
   Serial1.println("AT+CIPSERVER=1,80");
   delay(500);
-  Serial1.println("AT+CIPSTAMAC?");
-  delay(500);
   printIPAddr();
   
   readJointPositions();
@@ -143,14 +141,13 @@ void loop() {
   // put your main code here, to run repeatedly:
   recvWithStartEndMarkers();
   if (newData == true) {
-//    printIPAddr();
     if (decodeNanopbData()){
+//    if (temp_decode_nanopb()){
       updateTrajectory();
-//      writeJointPositions();
     }
     newData = false;
     ndx = 0;
   }
   
-//  executeTrajectory();
+  executeTrajectory();
 }

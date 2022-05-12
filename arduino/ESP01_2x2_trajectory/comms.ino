@@ -10,61 +10,57 @@ void printIPAddr(){
     Serial.write(ch);
   }
 }
+
+void add_new_rc(byte rc,bool ifend){
+  if(!ifend){
+    marker_count++;
+  }else{
+    marker_count = 0;
+  }
+  input_cmd[ndx] = rc;
+  ndx++;
+  if (ndx >= numChars) {
+    ndx = numChars - 1;
+  }
+}
+
 void recvWithStartEndMarkers() {
   byte rc;
   while (Serial1.available() > 0 && newData == false) {
     rc = Serial1.read();
-    
+//    Serial.println(rc);
     if (recvInProgress == true) {
       if (rc == endMarker) {
-//        Serial.println(rc);/
-        delay(5);
-        rc = Serial1.read();
-//          Serial.println(rc);/
-        if (rc == confMarker) {
-          delay(5);
-          rc = Serial1.read();
-//          Serial.println(rc);/
-          if (rc == confMarker) {
-            input_cmd[ndx] = '\0'; // terminate the string
-            recvInProgress = false;
-            newData = true;
-          }else{
-            input_cmd[ndx] = rc;
-            ndx++;
-            if (ndx >= numChars) {
-              ndx = numChars - 1;
-            }
-          }
-        } else{
-          input_cmd[ndx] = rc;
-          ndx++;
-          if (ndx >= numChars) {
-            ndx = numChars - 1;
-          }
+        add_new_rc(rc, false);
+      } 
+      else if(rc == confMarker){
+        add_new_rc(rc, false);
+        if(marker_count == 3){
+          marker_count = 0;
+          input_cmd[ndx] = '\0'; // terminate the string
+          recvInProgress = false;
+          newData = true;
+          ndx -= 3;
+          Serial.println(ndx);
         }
-      }
+      } 
       else {
-        input_cmd[ndx] = rc;
-        ndx++;
-        if (ndx >= numChars) {
-          ndx = numChars - 1;
-        }
+        add_new_rc(rc, true);
       }
     }
 
     else if (rc == startMarker) {
-      delay(10);
-      rc = Serial1.read();
-//      Serial.println(rc);/
-      if (rc == confMarker) {
-        delay(10);
-        rc = Serial1.read();
-//        Serial.println(rc);/
-        if (rc == confMarker) {
-          recvInProgress = true;
-        }
+      marker_count++;
+    }
+    else if (rc == confMarker) {
+      marker_count++;
+      if(marker_count == 3){
+        marker_count = 0;
+        recvInProgress = true; 
       }
+    }
+    else{
+      marker_count = 0;
     }
   }
 }
@@ -93,6 +89,7 @@ void recvWithStartEndMarkers() {
 //  for(int i=0; i<ndx; i++){
 //    Serial.print(input_cmd[i]);Serial.print(" ");
 //  }
+//  Serial.println();Serial.println(ndx);
 //  return false;
 //}
 
@@ -112,12 +109,11 @@ bool decodeNanopbData(){
     }
     else{
       for(int i=0; i<20; i++){
-        jt_pos = message.trajectory[i];
         for(int j=0; j<12; j++){
-          trajectory[i][j] = jt_pos.joint_pos[j];
-          Serial.print(jt_pos.joint_pos[j],7);Serial.print(" ");
+          trajectory[i][j] = message.trajectory[i*12 + j];
+//          Serial.print(message.trajectory[i*12 + j],4);Serial.print(" ");
         }
-        Serial.println();
+//        Serial.println();
       }
     }
   }
