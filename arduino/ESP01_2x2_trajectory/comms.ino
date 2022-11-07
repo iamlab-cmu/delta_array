@@ -7,7 +7,7 @@ void updateTrajectory(){
 void printIPAddr(){
   while (Serial1.available() > 0){
     char ch = Serial1.read();
-    Serial.write(ch);
+    Serial.print(ch);
   }
 }
 
@@ -40,8 +40,9 @@ void recvWithStartEndMarkers() {
           input_cmd[ndx] = '\0'; // terminate the string
           recvInProgress = false;
           newData = true;
-          ndx -= 3;
+          ndxx = ndx - 3;
           Serial.println(ndx);
+          ndx = 0;
         }
       } 
       else {
@@ -61,6 +62,7 @@ void recvWithStartEndMarkers() {
     }
     else{
       marker_count = 0;
+      ndx = 0;
     }
   }
 }
@@ -85,22 +87,51 @@ void recvWithStartEndMarkers() {
 //  }
 //}
 
-//bool temp_decode_nanopb(){
-//  for(int i=0; i<ndx; i++){
-//    Serial.print(input_cmd[i]);Serial.print(" ");
-//  }
-//  Serial.println();Serial.println(ndx);
-//  return false;
-//}
+String data = "";
+bool sent_done = false;
+
+bool send_done_signal(){
+  if(is_movement_done){
+    data = "A\r\n";
+  }else{
+    data = "B\r\n";
+  }
+  Serial.println(data);Serial.println(data.length());
+  Serial1.print("AT+CIPSEND=0,");Serial1.println(data.length());
+  delay(10);
+  Serial1.print(data);
+  Serial1.println("AT+CIPCLOSE=0");
+//  skip_trajectory = true;
+
+  for(int i=0; i < sizeof(input_cmd); i++){
+    input_cmd[i] = (uint8_t)0;
+  }
+  ndx = 0;
+  sent_done = true;
+  return true;
+}
+
 
 bool decodeNanopbData(){
-  pb_istream_t istream = pb_istream_from_buffer(input_cmd, ndx);
+  pb_istream_t istream = pb_istream_from_buffer(input_cmd, ndxx);
   bool ret = pb_decode(&istream, DeltaMessage_fields, &message);
   if (message.id == MY_ID){
     ret = true;
-  
+    skip_trajectory = false;
+//    Serial.println("HAKUNA");Serial.println(message.request_done_state);
     if (message.request_done_state){
-//        sendJointPositions();
+//      Serial.println("MATATA");
+//      if(is_movement_done){
+//        data = "A\r\n";
+//      }else{
+//        data = "B\r\n";
+//      }
+//      Serial.println(data);Serial.println(data.length());
+//      Serial1.print("AT+CIPSEND=0,");Serial1.println(data.length());
+//      delay(10);
+//      Serial1.print(data);
+//      Serial1.println("AT+CIPCLOSE=0");
+//      skip_trajectory = true;
     }
     else if (message.reset){
       for (int i=0; i<NUM_MOTORS; i++){
@@ -115,9 +146,15 @@ bool decodeNanopbData(){
         }
 //        Serial.println();
       }
+      for(int i=0; i < sizeof(input_cmd); i++){
+        input_cmd[i] = (uint8_t)0;
+      }
     }
+    ndx = 0;
   }
   else{
+    ndx = 0;
+    Serial.println("FAILED HAKUNA");
     ret = false;
   }
   return ret;

@@ -9,7 +9,7 @@
 #include<math.h>
 
 #define NUM_MOTORS 12
-#define MY_ID 1
+#define MY_ID 10
 
 
 //################################## Feather MC and ADC Libraries INIT #####################3
@@ -56,7 +56,7 @@ int channels[NUM_MOTORS] = {0,1,0,//1st robot
                             };
 //int channels[NUM_MOTORS] = {3};
 //##################################### GLOBAL VARIABLES ###################################3
-const int numChars = 1500;
+const int numChars = 3000;
 float pi = 3.1415926535;
 
 uint8_t input_cmd[numChars];
@@ -65,6 +65,7 @@ bool newData = false;
 DeltaMessage message = DeltaMessage_init_zero;
 static boolean recvInProgress = false;
 int ndx = 0;
+int ndxx = 0;
 char startMarker = 0xA6;
 char confMarker = '~';
 char endMarker = 0xA7;
@@ -73,6 +74,8 @@ int marker_count = 0;
 unsigned long current_arduino_time;
 unsigned long last_arduino_time;
 float time_elapsed;
+float total_time_elapsed;
+float exec_time;
 
 float joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 float new_joint_positions[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -90,6 +93,7 @@ float total_joint_errors[12] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
 int motor_val[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 bool is_movement_done = false;
+bool skip_trajectory = false;
 
 //################################# SETUP AND LOOP FUNCTIONS ################################3
 void setup() {
@@ -138,16 +142,17 @@ void setup() {
 }
 
 void loop() {
+//  Serial.println("HAKUNA MATATA");
   // put your main code here, to run repeatedly:
   recvWithStartEndMarkers();
   if (newData == true) {
     if (decodeNanopbData()){
-//    if (temp_decode_nanopb()){
-      updateTrajectory();
+      if (!skip_trajectory){
+        updateTrajectory();
+      }
     }
     newData = false;
     ndx = 0;
   }
-  
   executeTrajectory();
 }
