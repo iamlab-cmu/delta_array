@@ -1,6 +1,3 @@
-from audioop import alaw2lin
-from http.client import UNSUPPORTED_MEDIA_TYPE
-from turtle import down, up
 import delta_array_pb2
 import numpy as np
 from serial import Serial
